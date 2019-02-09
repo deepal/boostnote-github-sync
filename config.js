@@ -12,6 +12,7 @@ module.exports = {
         repository: {
             name: process.env.GITHUB_REPO,
             branch: 'master',
+            baseDir: '/'
         },
         commit: {
             userName: 'Boostnote Github Sync',
@@ -19,7 +20,11 @@ module.exports = {
         }
     },
     sync: {
-        enabled: true
+        enabled: true,
+        modes: {
+            raw: true,          // sync raw boostnote files
+            parsed: true,       // sync parsed Markdown files
+        }
     },
     watcher: {
         enabled: true,

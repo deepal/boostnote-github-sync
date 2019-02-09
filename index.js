@@ -7,6 +7,9 @@ launcher
     .withConfig(ConfigLoader.jsConfigLoader({
         filePath: './config.js'
     }))
+    .withLoggerConfig({
+        level: 'debug'
+    })
     .module({ name: 'github', path: './github'})
     .module({ name: 'preprocessor', path: './preprocessor'})
     .module({ name: 'sync', path: './sync'})

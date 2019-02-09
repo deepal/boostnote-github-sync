@@ -3,10 +3,11 @@
  * This helper currently supports creating/updating files only. Deleting files is not yet supported.
  */
 
- const requestFn = require('request');
- const fs = require('fs');
- const {resolve} = require('url');
- const {promisify} = require('util');
+const requestFn = require('request');
+const fs = require('fs');
+const { resolve } = require('url');
+const { join, basename } = require('path');
+const { promisify } = require('util');
 
 module.exports = class GithubHelper {
     /**
@@ -74,7 +75,7 @@ module.exports = class GithubHelper {
      * Get a reference to the HEAD of sync repository
      */
     async getHead() {
-        const {object} = await this.sendRequest({
+        const { object } = await this.sendRequest({
             method: 'get',
             path: `/repos/${this.userId}/${this.repo.name}/git/refs/${this.defaultRefs}`,      // default notes branch is 'master'
         });
@@ -87,23 +88,21 @@ module.exports = class GithubHelper {
      * @param {string} hash 
      */
     async getCommitTreeSHA(hash) {
-        const {message, tree} = await this.sendRequest({
+        const { message, tree } = await this.sendRequest({
             method: 'get',
             path: `/repos/${this.userId}/${this.repo.name}/git/commits/${hash}`
         });
         this.logger.debug(`fetched HEAD at : ${message} (${hash})`);
-        
+
         return tree.sha;
     }
 
     /**
-     * Post the file-to-by-synced as a git blob
+     * Post the content-to-by-synced as a git blob
      * @param {string} localFile 
      */
-    async publishBlob(localFile) {
-        const encoding = 'base64';
-        const content = (await promisify(fs.readFile)(localFile)).toString(encoding); 
-        const {sha} = await this.sendRequest({
+    async publishBlobFromContent({ content, encoding }) {
+        const { sha } = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/blobs`,
             body: { content, encoding }
@@ -119,27 +118,27 @@ module.exports = class GithubHelper {
      * @param {string} options.remoteFilePath
      * @param {string} options.blobSHA
      */
-    async updateTree({baseTreeSHA, remoteFilePath, blobSHA}) {
+    async updateTree({ baseTreeSHA, remoteFilePath, blobSHA }) {
         const GITHUB_BLOB_MODE = '100644';
         const GITHUB_BLOB_TYPE = 'blob';
 
-        const {sha} = await this.sendRequest({
+        const response = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/trees`,
             body: {
                 'base_tree': baseTreeSHA,
                 'tree': [
-                  {
-                    'path': remoteFilePath,
-                    'mode': GITHUB_BLOB_MODE,
-                    'type': GITHUB_BLOB_TYPE,
-                    'sha': blobSHA
-                  }
+                    {
+                        'path': remoteFilePath.replace(/^\/|\/$/, ''),      // remove leading and trailing slashes if any
+                        'mode': GITHUB_BLOB_MODE,
+                        'type': GITHUB_BLOB_TYPE,
+                        'sha': blobSHA
+                    }
                 ]
-              }
+            }
         });
-        
-        return sha;
+
+        return response.sha;
     }
 
     /**
@@ -149,8 +148,8 @@ module.exports = class GithubHelper {
      * @param {string} options.treeSHA
      * @param {string} options.message
      */
-    async createCommit({parentCommitSHA, treeSHA, message}) {
-        const {sha} = await this.sendRequest({
+    async commit({ parentCommitSHA, treeSHA, message }) {
+        const result = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/commits`,
             body: {
@@ -165,7 +164,7 @@ module.exports = class GithubHelper {
             }
         });
 
-        return sha;
+        return result.sha;
     }
 
     /**
@@ -179,7 +178,34 @@ module.exports = class GithubHelper {
             body: {
                 sha: commitSHA,
                 force: false
-              }
+            }
         });
+    }
+
+    async publishFile({ filePath, remotePath }) {
+        const encoding = 'base64';
+        const content = (await promisify(fs.readFile)(filePath)).toString(encoding);
+        return this.publishContent({ content, encoding, remotePath: (remotePath || basename(filePath)) });
+    }
+
+    async publishContent({ content, encoding, remotePath }) {
+        const destinationFile = join(this.repo.baseDir, remotePath);
+        await this.fetchGithubUser();
+        const headHash = await this.getHead();
+        const treeHash = await this.getCommitTreeSHA(headHash);
+        const blobHash = await this.publishBlobFromContent({ content, encoding });
+        const updatedTree = await this.updateTree({
+            baseTreeSHA: treeHash,
+            remoteFilePath: destinationFile,
+            blobSHA: blobHash
+        });
+        this.logger.debug(`Published blob. Updated tree hash: ${updatedTree}`);
+        const commitHash = await this.commit({
+            message: 'updated sample.md',
+            parentCommitSHA: headHash,
+            treeSHA: updatedTree
+        });
+        this.logger.debug(`Commit ${commitHash} created!`);
+        await this.updateHead(commitHash);
     }
 }
