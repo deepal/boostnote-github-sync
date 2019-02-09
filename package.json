@@ -1,0 +1,29 @@
+{
+  "name": "boostnote-github-sync",
+  "version": "0.0.1",
+  "description": "Sync BoostNote notes into Github Private Repository",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dpjayasekara/boostnote-github-sync.git"
+  },
+  "keywords": [
+    "boostnote",
+    "github"
+  ],
+  "author": "Deepal Jayasekara <dpjayasekara@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dpjayasekara/boostnote-github-sync/issues"
+  },
+  "homepage": "https://github.com/dpjayasekara/boostnote-github-sync#readme",
+  "dependencies": {
+    "@dpjayasekara/tscore": "^0.7.0",
+    "cson": "^5.1.0",
+    "dotenv": "^6.2.0",
+    "request": "^2.88.0"
+  }
+}
