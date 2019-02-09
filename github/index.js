@@ -5,7 +5,7 @@
 
  const requestFn = require('request');
  const fs = require('fs');
- const {join} = require('path');
+ const {resolve} = require('url');
  const {promisify} = require('util');
 
 module.exports = class GithubHelper {
@@ -21,9 +21,10 @@ module.exports = class GithubHelper {
         this.config = config;
 
         this.repo = this.config.repository;
-        this.commitUser = this.config.commit.userName;
-        this.commitUserEmail = this.config.commit.userEmail;
-        this.defaultRefs = `heads/${this.config.branch}`;
+        this.apiConfig = this.config.api;
+        this.commitConfig = this.config.commit;
+
+        this.defaultRefs = `heads/${this.repo.branch}`;
 
         this.sendRequest = this.createClient();
     }
@@ -34,24 +35,33 @@ module.exports = class GithubHelper {
     createClient() {
         const request = promisify(requestFn);
         return async ({ method, path, body }) => {
-            return request({
+            const response = await request({
                 method,
-                url: `${join(this.config.apiUrl, path)}`,
+                url: `${resolve(this.apiConfig.url, path)}`,
                 headers: {
-                    Authorization: `Bearer ${this.config.accessToken}`,
+                    Authorization: `Bearer ${this.apiConfig.accessToken}`,
+                    'User-Agent': '',
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
                 body,
                 json: true
             });
+            return response.body;
         }
+    }
+
+    /**
+     * Return github user id
+     */
+    getUser() {
+        return this.userId;
     }
 
     /**
      * Get github user id
      */
-    async getUser() {
+    async fetchGithubUser() {
         const { login } = await this.sendRequest({
             method: 'get',
             path: '/user'
@@ -64,9 +74,9 @@ module.exports = class GithubHelper {
      * Get a reference to the HEAD of sync repository
      */
     async getHead() {
-        const {object} = this.sendRequest({
+        const {object} = await this.sendRequest({
             method: 'get',
-            path: `/repos/${this.userId}/${this.repo}/git/refs/${this.defaultRefs}`,      // default notes branch is 'master'
+            path: `/repos/${this.userId}/${this.repo.name}/git/refs/${this.defaultRefs}`,      // default notes branch is 'master'
         });
 
         return object.sha;
@@ -77,9 +87,9 @@ module.exports = class GithubHelper {
      * @param {string} hash 
      */
     async getCommitTreeSHA(hash) {
-        const {message, tree} = this.sendRequest({
+        const {message, tree} = await this.sendRequest({
             method: 'get',
-            path: `/repos/${this.userId}/${this.repo}/git/commits/${hash}`
+            path: `/repos/${this.userId}/${this.repo.name}/git/commits/${hash}`
         });
         this.logger.debug(`fetched HEAD at : ${message} (${hash})`);
         
@@ -90,12 +100,12 @@ module.exports = class GithubHelper {
      * Post the file-to-by-synced as a git blob
      * @param {string} localFile 
      */
-    async createFileBlob(localFile) {
+    async publishBlob(localFile) {
         const encoding = 'base64';
         const content = (await promisify(fs.readFile)(localFile)).toString(encoding); 
-        const {sha} = this.sendRequest({
+        const {sha} = await this.sendRequest({
             method: 'post',
-            path: `/repos/${this.userId}/${this.repo}/git/blobs`,
+            path: `/repos/${this.userId}/${this.repo.name}/git/blobs`,
             body: { content, encoding }
         });
 
@@ -109,13 +119,13 @@ module.exports = class GithubHelper {
      * @param {string} options.remoteFilePath
      * @param {string} options.blobSHA
      */
-    updateTree({baseTreeSHA, remoteFilePath, blobSHA}) {
+    async updateTree({baseTreeSHA, remoteFilePath, blobSHA}) {
         const GITHUB_BLOB_MODE = '100644';
         const GITHUB_BLOB_TYPE = 'blob';
 
-        const {sha} = this.sendRequest({
+        const {sha} = await this.sendRequest({
             method: 'post',
-            path: `/repos/${this.userId}/${this.repo}/git/trees`,
+            path: `/repos/${this.userId}/${this.repo.name}/git/trees`,
             body: {
                 'base_tree': baseTreeSHA,
                 'tree': [
@@ -139,15 +149,15 @@ module.exports = class GithubHelper {
      * @param {string} options.treeSHA
      * @param {string} options.message
      */
-    createCommit({parentCommitSHA, treeSHA, message}) {
-        const {sha} = this.sendRequest({
+    async createCommit({parentCommitSHA, treeSHA, message}) {
+        const {sha} = await this.sendRequest({
             method: 'post',
-            path: `/repos/${this.userId}/${this.repo}/git/commits`,
+            path: `/repos/${this.userId}/${this.repo.name}/git/commits`,
             body: {
                 'message': message,
                 'author': {
-                    'name': this.commitUser,
-                    'email': this.commitUserEmail,
+                    'name': this.commitConfig.userName,
+                    'email': this.commitConfig.userEmail,
                     'date': (new Date()).toISOString()
                 },
                 'parents': [parentCommitSHA],
@@ -162,10 +172,10 @@ module.exports = class GithubHelper {
      * Update head with new commit
      * @param {string} commitSHA 
      */
-    updateHead(commitSHA) {
+    async updateHead(commitSHA) {
         return this.sendRequest({
             method: 'patch',
-            path: `/repos/${this.userId}/${this.repo}/git/refs/${this.defaultRefs}`,
+            path: `/repos/${this.userId}/${this.repo.name}/git/refs/${this.defaultRefs}`,
             body: {
                 sha: commitSHA,
                 force: false

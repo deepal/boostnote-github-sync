@@ -1,13 +1,19 @@
 require('dotenv').config();
+const Package = require('./package.json');
 const process = require('process');
 
 module.exports = {
     github: {
-        apiUrl: 'https://api.github.com',
-        accessToken: process.env.GITHUB_TOKEN,
-        repository: process.env.GITHUB_REPO,
-        branch: 'master',
-        commits: {
+        api: {
+            url: 'https://api.github.com',
+            accessToken: process.env.GITHUB_TOKEN,
+            userAgent: Package.name
+        },
+        repository: {
+            name: process.env.GITHUB_REPO,
+            branch: 'master',
+        },
+        commit: {
             userName: 'Boostnote Github Sync',
             userEmail: 'boostnotesync@example.com'
         }
