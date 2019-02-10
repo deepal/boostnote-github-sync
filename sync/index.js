@@ -38,6 +38,7 @@ module.exports = class Sync {
         const metadata = await this.github.fetchOrCreateSyncMetadata();
         const fileMetaRecord = metadata.notes.find(note => note.fileName === remoteFile);
         if (!fileMetaRecord) {
+            metadata.lastModified = new Date().toISOString();
             metadata.notes = [
                 ...metadata.notes,
                 {

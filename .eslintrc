@@ -4,6 +4,6 @@
         "indent": ["error", 4],
         "max-len": ["error", { "code": 200 }],
         "comma-dangle": ["error", "never"],
-        "valid-jsdoc": ["error", {"requireParamDescription": false}]
+        "valid-jsdoc": ["error", {"requireParamDescription": false, "requireReturnDescription": false}]
     }
 }
