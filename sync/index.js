@@ -34,38 +34,18 @@ module.exports = class Sync {
         // todo: publish raw files
     }
 
-    async updateMetadata(remoteFile, title) {
-        const metadata = await this.github.fetchOrCreateSyncMetadata();
-        const fileMetaRecord = metadata.notes.find(note => note.fileName === remoteFile);
-        if (!fileMetaRecord) {
-            metadata.lastModified = new Date().toISOString();
-            metadata.notes = [
-                ...metadata.notes,
-                {
-                    fileName: remoteFile,
-                    title
-                }
-            ];
-            await this.github.writeReadMe(metadata);
-        }
-        const encodedMetadata = Buffer.from(JSON.stringify(metadata), 'utf-8').toString('base64');
-        return this.github.updateSyncMetadata({ content: encodedMetadata, encoding: 'base64' });
-    }
-
     async publishParsedMarkdown(syncEvent) {
         const { type, raw, file } = syncEvent;
 
         // Only parse Markdown Notes for now
         if (type === 'MARKDOWN_NOTE') {
             const destinationFile = `${basename(file).replace(extname(file), '')}.md`;
-            const parsedContent = Buffer.from(raw.content, 'utf8').toString('base64');
+            const markdownContent = raw.content;
 
-            // Update metadatafile
-            await this.updateMetadata(destinationFile, raw.title);
-            await this.github.publishContent({
-                content: parsedContent,
-                encoding: 'base64',
-                remotePath: destinationFile
+            await this.github.publishNote({
+                content: markdownContent,
+                remotePath: destinationFile,
+                title: raw.title
             });
             this.logger.info(`Content of ${file} synced as a parsed markdown note`);
         }

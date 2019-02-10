@@ -6,7 +6,8 @@
 const fs = require('fs');
 const { join, basename } = require('path');
 const { promisify } = require('util');
-const { trimSlashes, jsonToBase64, encodeFromUtf8, utf8ToBase64 } = require('./helpers');
+const os = require('os');
+const { trimSlashes, utf8ToBase64 } = require('./helpers');
 const { Client, constants } = require('./client');
 
 module.exports = class GithubHelper {
@@ -66,6 +67,7 @@ module.exports = class GithubHelper {
                 branch: this.repoConfig.branch,
                 filePath: this.repoConfig.metadataFile
             });
+            this.logger.debug(`Fetched metadata file at ${this.repoConfig.metadataFile}`);
             return JSON.parse(content);
         } catch (err) {
             if (err.code === constants.ERR_FILE_NOT_FOUND) {
@@ -76,12 +78,13 @@ module.exports = class GithubHelper {
                     lastModified: timestamp,
                     notes: []
                 };
-                const encodedContent = jsonToBase64(metadataContent);
-                await this.publishContent({
-                    content: encodedContent,
-                    encoding: 'base64',
-                    remotePath: this.repoConfig.metadataFile
-                });
+                await this.publishContent([
+                    {
+                        content: JSON.stringify(metadataContent),
+                        encoding: 'base64',
+                        remotePath: this.repoConfig.metadataFile
+                    }
+                ]);
                 this.logger.info(`New metadata file created at ${this.repoConfig.metadataFile}`);
                 return metadataContent;
             }
@@ -93,17 +96,31 @@ module.exports = class GithubHelper {
 
     /**
      * Update sync metadata file
-     * @param {object} options
-     * @param {string} options.content
-     * @param {string} options.encoding
+     * @param {string} content
      * @returns {Promise<object>}
      */
-    async updateSyncMetadata({ content, encoding }) {
-        return this.publishContent({
-            content,
-            encoding,
-            remotePath: this.repoConfig.metadataFile
-        });
+    async updateSyncMetadata(content) {
+        return this.publishContent([
+            {
+                content,
+                remotePath: this.repoConfig.metadataFile
+            }
+        ]);
+    }
+
+    /**
+     * Generate table of contents in readme
+     * @param {object} metadata
+     * @returns {Promise<object>}
+     */
+    generateReadMe(metadata) { // eslint-disable-line class-methods-use-this
+        const { notes } = metadata;
+        let markdownContent = '# Table of Contents\n';
+        markdownContent += notes.reduce((out, { fileName, title }) => {
+            const formattedFilePath = `./${trimSlashes(fileName)}`;
+            return `${out}- [${title}](${formattedFilePath})\n`;
+        }, '');
+        return markdownContent;
     }
 
     /**
@@ -114,56 +131,86 @@ module.exports = class GithubHelper {
      * @returns {Promise<*>}
      */
     async publishFile({ filePath, remotePath }) {
-        const encoding = 'base64';
-        const content = encodeFromUtf8(await promisify(fs.readFile)(filePath), encoding);
-        return this.publishContent({ content, encoding, remotePath: (remotePath || basename(filePath)) });
+        const content = (await promisify(fs.readFile)(filePath)).toString();
+        return this.publishContent([
+            {
+                content,
+                remotePath: (remotePath || basename(filePath))
+            }
+        ]);
+    }
+
+    async publishNote({ content, remotePath, title }) {
+        // Add note content to be published to github
+        const objectsToPublish = [{
+            content,
+            remotePath
+        }];
+
+        const metadata = await this.fetchOrCreateSyncMetadata();
+        const fileMetaRecord = metadata.notes.find(note => note.fileName === remotePath);
+        if (!fileMetaRecord) {
+            this.logger.debug(`File ${remotePath} is not in metadata. Updating metadata.`);
+            metadata.lastModified = new Date().toISOString();
+            metadata.notes = [
+                ...metadata.notes,
+                {
+                    fileName: remotePath,
+                    title
+                }
+            ];
+
+            // Add metadata file to be published to github
+            objectsToPublish.push({
+                content: JSON.stringify(metadata),
+                remotePath: this.repoConfig.metadataFile
+            });
+
+            this.logger.debug('Re-building table of contents');
+            const readMeContent = this.generateReadMe(metadata);
+            // Add readme file to be published to github
+            objectsToPublish.push({
+                content: readMeContent,
+                remotePath: 'README.md'
+            });
+        }
+
+        return this.publishContent(objectsToPublish);
     }
 
     /**
      * Convenience function to sync content to github
-     * @param {object} options
-     * @param {object} options.content
-     * @param {object} options.encoding
-     * @param {object} options.remotePath
+     * @param {Array} objects
      * @returns {Promise<object>}
      */
-    async publishContent({ content, encoding, remotePath }) {
-        const destinationFile = join(this.repoConfig.baseDir, remotePath);
+    async publishContent(objects) {
         await this.client.fetchGithubUser();
         const headHash = await this.client.getHead();
         const treeHash = await this.client.getTreeHash(headHash);
-        const blobHash = await this.client.createBlob({ content, encoding });
-        const updatedTree = await this.client.createTree({
-            baseTreeSHA: treeHash,
-            remoteFilePath: destinationFile,
-            blobSHA: blobHash
-        });
-        this.logger.debug(`Published blob. Updated tree hash: ${updatedTree}`);
-        const commitHash = await this.client.commit({
-            message: `Sync content to remote file ${remotePath}`,
-            parentCommitSHA: headHash,
-            treeSHA: updatedTree
-        });
-        this.logger.debug(`Commit ${commitHash} created!`);
-        await this.client.updateHead(commitHash);
-    }
 
-    /**
-     * Update table of contents in readme
-     * @param {object} stats
-     * @returns {Promise<object>}
-     */
-    async writeReadMe(stats) {
-        const { notes } = stats;
-        let markdownContent = '# Table of Contents\n';
-        markdownContent += notes.reduce((out, { fileName, title }) => {
-            const formattedFilePath = `./${trimSlashes(fileName)}`;
-            return `${out}- [${title}](${formattedFilePath})\n`;
-        }, '');
-        return this.publishContent({
-            content: utf8ToBase64(markdownContent),
-            encoding: 'base64',
-            remotePath: 'README.md'
+        const blobs = await Promise.all(
+            objects.map(async ({ content, remotePath }) => {
+                const encodedContent = utf8ToBase64(content);
+                const path = join(this.repoConfig.baseDir, remotePath);
+                this.logger.debug(`Creating blob ${path}`);
+                const sha = await this.client.createBlob({ content: encodedContent, encoding: 'base64' });
+                return { path, sha };
+            })
+        );
+
+        this.logger.debug(`Creating tree from tree: ${treeHash}`);
+        const newTree = await this.client.createTree({
+            baseTreeSHA: treeHash,
+            blobs
         });
+
+        this.logger.debug(`Created tree: ${newTree}. Committing changes...`);
+        const commitHash = await this.client.commit({
+            message: `Sync notes from host: ${os.hostname()}`,
+            parentCommitSHA: headHash,
+            treeSHA: newTree
+        });
+        this.logger.debug(`Commit ${commitHash} created. Updating head...`);
+        await this.client.updateHead(commitHash);
     }
 };

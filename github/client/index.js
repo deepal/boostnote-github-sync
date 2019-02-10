@@ -208,20 +208,18 @@ exports.Client = class GithubClient {
      * @param {string} options.blobSHA
      * @returns {Promise<string>}
      */
-    async createTree({ baseTreeSHA, remoteFilePath, blobSHA }) {
+    async createTree({ baseTreeSHA, blobs = [] }) {
         const { status, body } = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repoConfig.name}/git/trees`,
             body: {
                 base_tree: baseTreeSHA,
-                tree: [
-                    {
-                        path: trimSlashes(remoteFilePath), // remove leading and trailing slashes if any
-                        mode: GITHUB_BLOB_MODE,
-                        type: GITHUB_BLOB_TYPE,
-                        sha: blobSHA
-                    }
-                ]
+                tree: blobs.map(({ path, sha }) => ({
+                    path: trimSlashes(path), // remove leading and trailing slashes if any
+                    mode: GITHUB_BLOB_MODE,
+                    type: GITHUB_BLOB_TYPE,
+                    sha
+                }))
             }
         });
 
