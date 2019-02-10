@@ -1,0 +1,3 @@
+module.exports = {
+    ERR_REPOSITORY_EMPTY: 'ERR_REPOSITORY_EMPTY'
+};

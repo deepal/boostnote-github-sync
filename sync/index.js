@@ -52,20 +52,24 @@ module.exports = class Sync {
     }
 
     async sync() {
-        if (this.config.enabled) {
-            while (this.queue.length()) {
-                const item = this.queue.dequeue();
+        try {
+            if (this.config.enabled) {
+                while (this.queue.length()) {
+                    const item = this.queue.dequeue();
 
-                if (this.config.modes.raw) {
-                    await this.publishRaw(item); // eslint-disable-line no-await-in-loop
-                }
+                    if (this.config.modes.raw) {
+                        await this.publishRaw(item); // eslint-disable-line no-await-in-loop
+                    }
 
-                if (this.config.modes.parsed) {
-                    await this.publishParsedMarkdown(item); // eslint-disable-line no-await-in-loop
+                    if (this.config.modes.parsed) {
+                        await this.publishParsedMarkdown(item); // eslint-disable-line no-await-in-loop
+                    }
                 }
+            } else {
+                this.logger.info('Sync is disabled by configuration');
             }
-        } else {
-            this.logger.info('Sync is disabled by configuration');
+        } catch (err) {
+            this.logger.error('Error occurred during sync process', err);
         }
     }
 };

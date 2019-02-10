@@ -7,6 +7,7 @@ const requestFn = require('request');
 const { resolve } = require('url');
 const { promisify } = require('util');
 const httpStatus = require('../httpStatus');
+const errorCode = require('./errors');
 const {
     trimSlashes,
     decodeToUtf8
@@ -17,6 +18,7 @@ const GITHUB_BLOB_TYPE = 'blob';
 const ERR_FILE_NOT_FOUND = 'ENOENT';
 
 exports.constants = { GITHUB_BLOB_MODE, GITHUB_BLOB_TYPE, ERR_FILE_NOT_FOUND };
+exports.errorCode = errorCode;
 
 exports.Client = class GithubClient {
     /**
@@ -102,6 +104,12 @@ exports.Client = class GithubClient {
             method: 'get',
             path: `/repos/${this.userId}/${this.repoConfig.name}/git/refs/${refs}` // default notes branch is 'master'
         });
+
+        if (status === httpStatus.CONFLICT) {
+            const error = new Error(body.message);
+            error.code = errorCode.ERR_REPOSITORY_EMPTY;
+            throw error;
+        }
 
         if (status !== httpStatus.OK) {
             this.logger.error(body);
@@ -281,5 +289,32 @@ exports.Client = class GithubClient {
             throw new Error('Failed to update head');
         }
         return body;
+    }
+
+    /**
+     * Initialize empty repository with a README.md file
+     * @returns {Promise<object>}
+     */
+    async initializeReadMe() {
+        const { status, body } = await this.sendRequest({
+            method: 'put',
+            path: `/repos/${this.userId}/${this.repoConfig.name}/contents/README.md`,
+            body: {
+                message: 'Initial commit',
+                committer: {
+                    name: this.commitConfig.userName,
+                    email: this.commitConfig.userEmail
+                },
+                content: ''
+            }
+        });
+
+        if (status !== httpStatus.CREATED) {
+            this.logger.error(body.message);
+            throw new Error('Failed to initialize repository');
+        }
+
+        const { commit } = body;
+        return commit.sha;
     }
 };

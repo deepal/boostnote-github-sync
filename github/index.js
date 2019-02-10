@@ -8,7 +8,7 @@ const { join, basename } = require('path');
 const { promisify } = require('util');
 const os = require('os');
 const { trimSlashes, utf8ToBase64 } = require('./helpers');
-const { Client, constants } = require('./client');
+const { Client, constants, errorCode } = require('./client');
 
 module.exports = class GithubHelper {
     /**
@@ -34,6 +34,24 @@ module.exports = class GithubHelper {
     }
 
     /**
+     * Validate and initialize repository
+     * @returns {Promise<void>}
+     */
+    async initializeRepository() {
+        try {
+            await this.client.fetchGithubUser();
+            await this.client.getHead();
+        } catch (err) {
+            if (err.code === errorCode.ERR_REPOSITORY_EMPTY) {
+                await this.client.initializeReadMe();
+                return;
+            }
+
+            throw new Error('Failed to initialize repository', err);
+        }
+    }
+
+    /**
      * Fetch a file from the given branch
      * @param {object} options
      * @param {string} options.branch
@@ -41,7 +59,7 @@ module.exports = class GithubHelper {
      * @returns {Promise<object>}
      */
     async fetchFile({ branch, filePath }) {
-        await this.client.fetchGithubUser();
+        await this.initializeRepository();
         const headSHA = await this.client.getHead(branch);
         const treeSHA = await this.client.getTreeHash(headSHA);
         const { tree, truncated } = await this.client.getTree(treeSHA);
@@ -184,7 +202,7 @@ module.exports = class GithubHelper {
      * @returns {Promise<object>}
      */
     async publishContent(objects) {
-        await this.client.fetchGithubUser();
+        await this.initializeRepository();
         const headHash = await this.client.getHead();
         const treeHash = await this.client.getTreeHash(headHash);
 
