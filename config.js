@@ -12,7 +12,8 @@ module.exports = {
         repository: {
             name: process.env.GITHUB_REPO,
             branch: 'master',
-            baseDir: '/'
+            baseDir: '/',
+            metadataFile: '.bgs_stats.json'
         },
         commit: {
             userName: 'Boostnote Github Sync',
