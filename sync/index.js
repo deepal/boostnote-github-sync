@@ -46,6 +46,7 @@ module.exports = class Sync {
                     title
                 }
             ];
+            await this.github.writeReadMe(metadata);
         }
         const encodedMetadata = Buffer.from(JSON.stringify(metadata), 'utf-8').toString('base64');
         return this.github.updateSyncMetadata({ content: encodedMetadata, encoding: 'base64' });

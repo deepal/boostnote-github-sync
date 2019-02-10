@@ -6,11 +6,11 @@
 const requestFn = require('request');
 const { resolve } = require('url');
 const { promisify } = require('util');
-const httpStatus = require('./httpStatus');
+const httpStatus = require('../httpStatus');
 const {
     trimSlashes,
     decodeToUtf8
-} = require('./helpers');
+} = require('../helpers');
 
 const GITHUB_BLOB_MODE = '100644';
 const GITHUB_BLOB_TYPE = 'blob';
@@ -185,6 +185,11 @@ exports.Client = class GithubClient {
             method: 'get',
             path: requestPath
         });
+
+        if (status === httpStatus.NOT_FOUND) {
+            // tree is empty
+            return { tree: [], truncated: false };
+        }
 
         if (status !== httpStatus.OK) {
             this.logger.error(body);

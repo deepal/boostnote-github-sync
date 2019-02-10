@@ -6,7 +6,7 @@
 const fs = require('fs');
 const { join, basename } = require('path');
 const { promisify } = require('util');
-const { trimSlashes, jsonToBase64, encodeFromUtf8 } = require('./helpers');
+const { trimSlashes, jsonToBase64, encodeFromUtf8, utf8ToBase64 } = require('./helpers');
 const { Client, constants } = require('./client');
 
 module.exports = class GithubHelper {
@@ -146,5 +146,24 @@ module.exports = class GithubHelper {
         });
         this.logger.debug(`Commit ${commitHash} created!`);
         await this.client.updateHead(commitHash);
+    }
+
+    /**
+     * Update table of contents in readme
+     * @param {object} stats
+     * @returns {Promise<object>}
+     */
+    async writeReadMe(stats) {
+        const { notes } = stats;
+        let markdownContent = '# Table of Contents\n';
+        markdownContent += notes.reduce((out, { fileName, title }) => {
+            const formattedFilePath = `./${trimSlashes(fileName)}`;
+            return `${out}- [${title}](${formattedFilePath})\n`;
+        }, '');
+        return this.publishContent({
+            content: utf8ToBase64(markdownContent),
+            encoding: 'base64',
+            remotePath: 'README.md'
+        });
     }
 };
