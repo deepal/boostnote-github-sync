@@ -16,7 +16,7 @@ module.exports = class SyncQueue {
         this.queue = [...this.queue, item];
     }
 
-    dequeue(item) {
+    dequeue() {
         const [item, ...remainingItems] = this.queue;
         this.queue = [...remainingItems];
         return item;

@@ -22,7 +22,7 @@ module.exports = {
     sync: {
         enabled: true,
         modes: {
-            raw: true,          // sync raw boostnote files
+            raw: false,          // sync raw boostnote files
             parsed: true,       // sync parsed Markdown files
         }
     },

@@ -8,6 +8,8 @@ const fs = require('fs');
 const { resolve } = require('url');
 const { join, basename } = require('path');
 const { promisify } = require('util');
+const httpStatus = require('./httpStatus');
+const {pathDepth, trimSlashes} = require('./helpers');
 
 module.exports = class GithubHelper {
     /**
@@ -48,7 +50,11 @@ module.exports = class GithubHelper {
                 body,
                 json: true
             });
-            return response.body;
+            
+            return {
+                status: response.statusCode,
+                body: response.body
+            };
         }
     }
 
@@ -63,11 +69,17 @@ module.exports = class GithubHelper {
      * Get github user id
      */
     async fetchGithubUser() {
-        const { login } = await this.sendRequest({
+        const {status, body} = await this.sendRequest({
             method: 'get',
             path: '/user'
         });
 
+        if (status !== httpStatus.OK) {
+            this.logger.error(body);
+            throw new Error('Failed to fetch user details');
+        }
+
+        const { login } = body;
         this.userId = login;
     }
 
@@ -75,11 +87,17 @@ module.exports = class GithubHelper {
      * Get a reference to the HEAD of sync repository
      */
     async getHead() {
-        const { object } = await this.sendRequest({
+        const {status, body} = await this.sendRequest({
             method: 'get',
             path: `/repos/${this.userId}/${this.repo.name}/git/refs/${this.defaultRefs}`,      // default notes branch is 'master'
         });
 
+        if (status !== httpStatus.OK) {
+            this.logger.error(body);
+            throw new Error('Failed to fetch head');
+        }
+
+        const { object } = body;
         return object.sha;
     }
 
@@ -88,12 +106,18 @@ module.exports = class GithubHelper {
      * @param {string} hash 
      */
     async getCommitTreeSHA(hash) {
-        const { message, tree } = await this.sendRequest({
+        const {status, body} = await this.sendRequest({
             method: 'get',
             path: `/repos/${this.userId}/${this.repo.name}/git/commits/${hash}`
         });
-        this.logger.debug(`fetched HEAD at : ${message} (${hash})`);
 
+        if (status !== httpStatus.OK) {
+            this.logger.error(body);
+            throw new Error('Failed to fetch commit stats');
+        }
+
+        const { message, tree } = body;
+        this.logger.debug(`fetched HEAD at : ${message} (${hash})`);
         return tree.sha;
     }
 
@@ -102,12 +126,17 @@ module.exports = class GithubHelper {
      * @param {string} localFile 
      */
     async publishBlobFromContent({ content, encoding }) {
-        const { sha } = await this.sendRequest({
+        const {status, body} = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/blobs`,
             body: { content, encoding }
         });
+        if (status !== httpStatus.CREATED) {
+            this.logger.error(body);
+            throw new Error('Failed to publish blob from content');
+        }
 
+        const { sha } = body;
         return sha;
     }
 
@@ -122,14 +151,14 @@ module.exports = class GithubHelper {
         const GITHUB_BLOB_MODE = '100644';
         const GITHUB_BLOB_TYPE = 'blob';
 
-        const response = await this.sendRequest({
+        const {status, body} = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/trees`,
             body: {
                 'base_tree': baseTreeSHA,
                 'tree': [
                     {
-                        'path': remoteFilePath.replace(/^\/|\/$/, ''),      // remove leading and trailing slashes if any
+                        'path': trimSlashes(remoteFilePath),      // remove leading and trailing slashes if any
                         'mode': GITHUB_BLOB_MODE,
                         'type': GITHUB_BLOB_TYPE,
                         'sha': blobSHA
@@ -138,7 +167,11 @@ module.exports = class GithubHelper {
             }
         });
 
-        return response.sha;
+        if (status !== httpStatus.CREATED) {
+            this.logger.error(body);
+            throw new Error('Failed to update tree');
+        }
+        return body.sha;
     }
 
     /**
@@ -149,7 +182,7 @@ module.exports = class GithubHelper {
      * @param {string} options.message
      */
     async commit({ parentCommitSHA, treeSHA, message }) {
-        const result = await this.sendRequest({
+        const {status, body} = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/commits`,
             body: {
@@ -164,7 +197,11 @@ module.exports = class GithubHelper {
             }
         });
 
-        return result.sha;
+        if (status !== httpStatus.CREATED) {
+            this.logger.error(body);
+            throw new Error('Failed to commit file');
+        }
+        return body.sha;
     }
 
     /**
@@ -172,7 +209,7 @@ module.exports = class GithubHelper {
      * @param {string} commitSHA 
      */
     async updateHead(commitSHA) {
-        return this.sendRequest({
+        const {status, body} = await this.sendRequest({
             method: 'patch',
             path: `/repos/${this.userId}/${this.repo.name}/git/refs/${this.defaultRefs}`,
             body: {
@@ -180,14 +217,33 @@ module.exports = class GithubHelper {
                 force: false
             }
         });
-    }
 
+        if (status !== httpStatus.OK) {
+            this.logger.error(body);
+            throw new Error('Failed to update head');
+        }
+        return body;
+    }
+    
+    /**
+     * Convenience function to sync file to github
+     * @param {object} options 
+     * @param {string} options.filePath
+     * @param {string} options.remotePath 
+     */
     async publishFile({ filePath, remotePath }) {
         const encoding = 'base64';
         const content = (await promisify(fs.readFile)(filePath)).toString(encoding);
         return this.publishContent({ content, encoding, remotePath: (remotePath || basename(filePath)) });
     }
 
+    /**
+     * Convenience function to sync content to github
+     * @param {object} options
+     * @param {object} options.content
+     * @param {object} options.encoding
+     * @param {object} options.remotePath
+     */
     async publishContent({ content, encoding, remotePath }) {
         const destinationFile = join(this.repo.baseDir, remotePath);
         await this.fetchGithubUser();
@@ -201,7 +257,7 @@ module.exports = class GithubHelper {
         });
         this.logger.debug(`Published blob. Updated tree hash: ${updatedTree}`);
         const commitHash = await this.commit({
-            message: 'updated sample.md',
+            message: `Sync content to remote file ${remotePath}`,
             parentCommitSHA: headHash,
             treeSHA: updatedTree
         });
