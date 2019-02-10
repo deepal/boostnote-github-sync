@@ -43,6 +43,7 @@ module.exports = class GithubHelper {
             await this.client.getHead();
         } catch (err) {
             if (err.code === errorCode.ERR_REPOSITORY_EMPTY) {
+                this.logger.debug('Repository seems to be empty. Initializing with a README.md');
                 await this.client.initializeReadMe();
                 return;
             }
