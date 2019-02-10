@@ -62,4 +62,4 @@ module.exports = {
     URI_TOO_LONG: 414,
     USE_PROXY: 305,
     VARIANT_ALSO_NEGOTIATES: 506
-}
+};

@@ -1,5 +1,5 @@
 /**
- * Github Helper for Boostnote Github Sync. 
+ * Github Helper for Boostnote Github Sync.
  * This helper currently supports creating/updating files only. Deleting files is not yet supported.
  */
 
@@ -9,14 +9,14 @@ const { resolve } = require('url');
 const { join, basename } = require('path');
 const { promisify } = require('util');
 const httpStatus = require('./httpStatus');
-const {pathDepth, trimSlashes} = require('./helpers');
+const { trimSlashes } = require('./helpers');
 
 module.exports = class GithubHelper {
     /**
      * Create a Github Helper object
-     * @param {*} container 
-     * @param {*} logger 
-     * @param {*} config 
+     * @param {*} container
+     * @param {*} logger
+     * @param {*} config
      */
     constructor(container, logger, config) {
         this.container = container;
@@ -45,17 +45,17 @@ module.exports = class GithubHelper {
                     Authorization: `Bearer ${this.apiConfig.accessToken}`,
                     'User-Agent': '',
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    Accept: 'application/json'
                 },
                 body,
                 json: true
             });
-            
+
             return {
                 status: response.statusCode,
                 body: response.body
             };
-        }
+        };
     }
 
     /**
@@ -69,7 +69,7 @@ module.exports = class GithubHelper {
      * Get github user id
      */
     async fetchGithubUser() {
-        const {status, body} = await this.sendRequest({
+        const { status, body } = await this.sendRequest({
             method: 'get',
             path: '/user'
         });
@@ -87,9 +87,9 @@ module.exports = class GithubHelper {
      * Get a reference to the HEAD of sync repository
      */
     async getHead() {
-        const {status, body} = await this.sendRequest({
+        const { status, body } = await this.sendRequest({
             method: 'get',
-            path: `/repos/${this.userId}/${this.repo.name}/git/refs/${this.defaultRefs}`,      // default notes branch is 'master'
+            path: `/repos/${this.userId}/${this.repo.name}/git/refs/${this.defaultRefs}` // default notes branch is 'master'
         });
 
         if (status !== httpStatus.OK) {
@@ -103,10 +103,10 @@ module.exports = class GithubHelper {
 
     /**
      * Grab the tree information from the commit that HEAD points to
-     * @param {string} hash 
+     * @param {string} hash
      */
     async getCommitTreeSHA(hash) {
-        const {status, body} = await this.sendRequest({
+        const { status, body } = await this.sendRequest({
             method: 'get',
             path: `/repos/${this.userId}/${this.repo.name}/git/commits/${hash}`
         });
@@ -123,10 +123,10 @@ module.exports = class GithubHelper {
 
     /**
      * Post the content-to-by-synced as a git blob
-     * @param {string} localFile 
+     * @param {string} localFile
      */
     async publishBlobFromContent({ content, encoding }) {
-        const {status, body} = await this.sendRequest({
+        const { status, body } = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/blobs`,
             body: { content, encoding }
@@ -151,17 +151,17 @@ module.exports = class GithubHelper {
         const GITHUB_BLOB_MODE = '100644';
         const GITHUB_BLOB_TYPE = 'blob';
 
-        const {status, body} = await this.sendRequest({
+        const { status, body } = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/trees`,
             body: {
-                'base_tree': baseTreeSHA,
-                'tree': [
+                base_tree: baseTreeSHA,
+                tree: [
                     {
-                        'path': trimSlashes(remoteFilePath),      // remove leading and trailing slashes if any
-                        'mode': GITHUB_BLOB_MODE,
-                        'type': GITHUB_BLOB_TYPE,
-                        'sha': blobSHA
+                        path: trimSlashes(remoteFilePath), // remove leading and trailing slashes if any
+                        mode: GITHUB_BLOB_MODE,
+                        type: GITHUB_BLOB_TYPE,
+                        sha: blobSHA
                     }
                 ]
             }
@@ -176,24 +176,24 @@ module.exports = class GithubHelper {
 
     /**
      * Create a new commit after updating tree
-     * @param {object} options 
+     * @param {object} options
      * @param {string} options.parentCommitSHA
      * @param {string} options.treeSHA
      * @param {string} options.message
      */
     async commit({ parentCommitSHA, treeSHA, message }) {
-        const {status, body} = await this.sendRequest({
+        const { status, body } = await this.sendRequest({
             method: 'post',
             path: `/repos/${this.userId}/${this.repo.name}/git/commits`,
             body: {
-                'message': message,
-                'author': {
-                    'name': this.commitConfig.userName,
-                    'email': this.commitConfig.userEmail,
-                    'date': (new Date()).toISOString()
+                message,
+                author: {
+                    name: this.commitConfig.userName,
+                    email: this.commitConfig.userEmail,
+                    date: (new Date()).toISOString()
                 },
-                'parents': [parentCommitSHA],
-                'tree': treeSHA
+                parents: [parentCommitSHA],
+                tree: treeSHA
             }
         });
 
@@ -206,10 +206,10 @@ module.exports = class GithubHelper {
 
     /**
      * Update head with new commit
-     * @param {string} commitSHA 
+     * @param {string} commitSHA
      */
     async updateHead(commitSHA) {
-        const {status, body} = await this.sendRequest({
+        const { status, body } = await this.sendRequest({
             method: 'patch',
             path: `/repos/${this.userId}/${this.repo.name}/git/refs/${this.defaultRefs}`,
             body: {
@@ -224,12 +224,12 @@ module.exports = class GithubHelper {
         }
         return body;
     }
-    
+
     /**
      * Convenience function to sync file to github
-     * @param {object} options 
+     * @param {object} options
      * @param {string} options.filePath
-     * @param {string} options.remotePath 
+     * @param {string} options.remotePath
      */
     async publishFile({ filePath, remotePath }) {
         const encoding = 'base64';
@@ -264,4 +264,4 @@ module.exports = class GithubHelper {
         this.logger.debug(`Commit ${commitHash} created!`);
         await this.updateHead(commitHash);
     }
-}
+};

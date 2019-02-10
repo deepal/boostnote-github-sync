@@ -1,0 +1,8 @@
+{
+    "extends": "airbnb",
+    "rules": {
+        "indent": ["error", 4],
+        "max-len": ["error", { "code": 200 }],
+        "comma-dangle": ["error", "never"]
+    }
+}

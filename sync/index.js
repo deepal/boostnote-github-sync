@@ -1,7 +1,7 @@
+const { basename, extname } = require('path');
 const SyncQueue = require('./queue');
-const {basename, extname} = require('path');
 
-module.exports = class Sync { 
+module.exports = class Sync {
     constructor(container, logger, config) {
         this.container = container;
         this.logger = logger;
@@ -30,12 +30,12 @@ module.exports = class Sync {
             });
     }
 
-    async publishRaw(syncEvent) {
+    async publishRaw(syncEvent) {   // eslint-disable-line
         // todo: publish raw files
     }
 
     async publishParsedMarkdown(syncEvent) {
-        const {type, raw, file} = syncEvent;
+        const { type, raw, file } = syncEvent;
 
         // Only parse Markdown Notes for now
         if (type === 'MARKDOWN_NOTE') {
@@ -52,19 +52,19 @@ module.exports = class Sync {
 
     async sync() {
         if (this.config.enabled) {
-            while(this.queue.length()) {
+            while (this.queue.length()) {
                 const item = this.queue.dequeue();
 
                 if (this.config.modes.raw) {
-                    await this.publishRaw(item);
+                    await this.publishRaw(item); // eslint-disable-line no-await-in-loop
                 }
 
                 if (this.config.modes.parsed) {
-                    await this.publishParsedMarkdown(item);
+                    await this.publishParsedMarkdown(item); // eslint-disable-line no-await-in-loop
                 }
             }
         } else {
-            this.logger.info(`Sync is disabled by configuration`);
+            this.logger.info('Sync is disabled by configuration');
         }
     }
-}
+};

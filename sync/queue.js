@@ -37,4 +37,4 @@ module.exports = class SyncQueue {
     clearLogs() {
         this.history = [];
     }
-}
+};

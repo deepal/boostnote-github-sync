@@ -1,6 +1,6 @@
 require('dotenv').config();
-const Package = require('./package.json');
 const process = require('process');
+const Package = require('./package.json');
 
 module.exports = {
     github: {
@@ -22,8 +22,8 @@ module.exports = {
     sync: {
         enabled: true,
         modes: {
-            raw: false,          // sync raw boostnote files
-            parsed: true,       // sync parsed Markdown files
+            raw: false, // sync raw boostnote files
+            parsed: true // sync parsed Markdown files
         }
     },
     watcher: {
@@ -32,4 +32,4 @@ module.exports = {
             process.env.LOCAL_BOOSTNOTE_DIR
         ]
     }
-}
+};

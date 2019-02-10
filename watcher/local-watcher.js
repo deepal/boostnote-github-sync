@@ -1,6 +1,6 @@
 const fs = require('fs');
-const {promisify} = require('util');
-const {join} = require('path');
+const { promisify } = require('util');
+const { join } = require('path');
 
 const readDir = promisify(fs.readdir);
 const getStats = promisify(fs.stat);
@@ -17,8 +17,8 @@ module.exports = class LocalWatcher {
     async start(onChangeDetected) {
         await Promise.all(
             this.config.localDirs.map(async (localDir) => {
-                await this.watch(localDir, onChangeDetected)
-            })
+                await this.watch(localDir, onChangeDetected);
+            }),
         );
     }
 
@@ -37,8 +37,8 @@ module.exports = class LocalWatcher {
                     const itemPath = join(directory, itemName);
                     // recursively watch the subdirectories
                     await this.watch(itemPath, onChangeDetected);
-                })
+                }),
             );
         }
     }
-}
+};
