@@ -15,15 +15,19 @@ module.exports = class Watcher {
     }
 
     watch() {
-        this.localWatcher
-            .start((event, filename) => {
-                this.sync.enqueueSyncItem(event, filename);
-            })
-            .then(() => {
-                this.logger.info('Watcher started');
-            })
-            .catch((err) => {
-                this.logger.error('Error occurred while watching', err);
-            });
+        if (this.config.enabled) {
+            this.localWatcher
+                .start((event, filename) => {
+                    this.sync.enqueueSyncItem(event, filename);
+                })
+                .then(() => {
+                    this.logger.info('Watcher started');
+                })
+                .catch((err) => {
+                    this.logger.error('Error occurred while watching', err);
+                });
+        } else {
+            this.logger.info('Watcher is disabled by configuration');
+        }
     }
 };

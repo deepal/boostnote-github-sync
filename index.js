@@ -1,4 +1,5 @@
 const { Launcher, ConfigLoader } = require('@dpjayasekara/tscore');
+
 const launcher = new Launcher({
     name: 'test'
 });
@@ -10,8 +11,8 @@ launcher
     .withLoggerConfig({
         level: 'debug'
     })
-    .module({ name: 'github', path: './github'})
-    .module({ name: 'preprocessor', path: './preprocessor'})
-    .module({ name: 'sync', path: './sync'})
-    .module({ name: 'watcher', path: './watcher'})
+    .module({ name: 'github', path: './github' })
+    .module({ name: 'preprocessor', path: './preprocessor' })
+    .module({ name: 'sync', path: './sync' })
+    .module({ name: 'watcher', path: './watcher' })
     .start();
