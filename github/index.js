@@ -166,20 +166,38 @@ module.exports = class GithubHelper {
             remotePath
         }];
 
+        const metadataToPublish = {
+            fileName: remotePath,
+            title
+        };
+
         const metadata = await this.fetchOrCreateSyncMetadata();
         const fileMetaRecord = metadata.notes.find(note => note.fileName === remotePath);
-        if (!fileMetaRecord) {
+        const isNewNote = !fileMetaRecord;
+        const isTitleChanged = !isNewNote && fileMetaRecord.title !== metadataToPublish.title;
+
+        if (isNewNote) {
             this.logger.debug(`File ${remotePath} is not in metadata. Updating metadata.`);
             metadata.lastModified = new Date().toISOString();
             metadata.notes = [
                 ...metadata.notes,
-                {
-                    fileName: remotePath,
-                    title
-                }
+                metadataToPublish
             ];
+        } else if (isTitleChanged) {
+            this.logger.debug(`Note details already exist in metadata, but the note title has been changed to ${title}`);
+            metadata.lastModified = new Date().toISOString();
+            metadata.notes = metadata.notes.map((curr) => {
+                if (curr.fileName === remotePath) {
+                    return { ...curr, title };
+                }
+                return curr;
+            });
+        }
 
-            // Add metadata file to be published to github
+        if (isNewNote || isTitleChanged) {
+            /* If the note is new or metadata has been changed, metadata should be republished,
+             * and the table of contents should be updated.
+            */
             objectsToPublish.push({
                 content: JSON.stringify(metadata),
                 remotePath: this.repoConfig.metadataFile
@@ -187,7 +205,6 @@ module.exports = class GithubHelper {
 
             this.logger.debug('Re-building table of contents');
             const readMeContent = this.generateReadMe(metadata);
-            // Add readme file to be published to github
             objectsToPublish.push({
                 content: readMeContent,
                 remotePath: 'README.md'
