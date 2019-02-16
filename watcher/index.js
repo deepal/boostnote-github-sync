@@ -2,6 +2,12 @@ const { Constants } = require('@dpjayasekara/tscore');
 const LocalWatcher = require('./local-watcher');
 
 module.exports = class Watcher {
+    /**
+     * Construct a Watcher object
+     * @param {Map} container
+     * @param {Logger} logger
+     * @param {Object} config
+     */
     constructor(container, logger, config) {
         this.container = container;
         this.logger = logger;
@@ -14,6 +20,10 @@ module.exports = class Watcher {
         this.container.on(Constants.EVENT.APPLICATION_START, this.watch);
     }
 
+    /**
+     * Start watcher process
+     * @returns {void}
+     */
     watch() {
         if (this.config.enabled) {
             this.localWatcher

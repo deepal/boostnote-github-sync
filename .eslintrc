@@ -5,6 +5,18 @@
         "max-len": ["error", { "code": 200 }],
         "comma-dangle": ["error", "never"],
         "object-curly-newline": "off",
-        "valid-jsdoc": ["error", {"requireParamDescription": false, "requireReturnDescription": false}]
+        "valid-jsdoc": ["error", {"requireParamDescription": false, "requireReturnDescription": false}],
+        "prefer-destructuring": ["error", {
+            "VariableDeclarator": {
+              "array": false,
+              "object": true
+            },
+            "AssignmentExpression": {
+              "array": true,
+              "object": true
+            }
+          }, {
+            "enforceForRenamedProperties": false
+        }]
     }
 }
