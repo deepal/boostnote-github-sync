@@ -16,5 +16,5 @@ exports.isNoteEmpty = (raw) => {
  * @returns {Object}
  */
 exports.sanitizeNote = (raw) => { // eslint-disable-line arrow-body-style
-    return raw ? { ...raw, title: 'Empty Note', content: '_No Content_' } : raw;
+    return raw ? { title: 'Empty Note', content: '_No Content_', ...raw } : raw;
 };

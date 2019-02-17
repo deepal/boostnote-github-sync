@@ -125,14 +125,13 @@ module.exports = class SnippetPublisher {
      * @param {string} options.raw
      * @returns {Promise<object>}
      */
-    async publish({ file, raw }) {
-        const noteContent = this.buildNoteContent(raw);
-        const destinationFile = `${basename(file).replace(extname(file), '')}.md`;
+    async publish({ file, title, content }) {
+        const noteContent = this.buildNoteContent(content);
 
         return this.github.publishNote({
-            content: noteContent,
-            remotePath: destinationFile,
-            title: raw.title
+            file,
+            title,
+            content: noteContent
         });
     }
 };

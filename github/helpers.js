@@ -1,3 +1,5 @@
+const { basename, join, extname } = require('path');
+
 exports.trimSlashes = (str) => {
     if (str && typeof str === 'string') {
         return str.replace(/^\/|\/$/g, '');
@@ -5,6 +7,16 @@ exports.trimSlashes = (str) => {
     return str;
 };
 
+exports.getRemoteMarkdownPath = ({ localPath, baseDir = '/', subDir = '/' }) => { // eslint-disable-line arrow-body-style
+    return exports.trimSlashes(
+        join(
+            baseDir,
+            subDir,
+            `${basename(localPath).replace(extname(localPath), '')}.md`
+        )
+    );
+};
+exports.getRemoteRawPath = ({ localPath, baseDir = '/', subDir = '/' }) => exports.trimSlashes(join(baseDir, subDir, basename(localPath)));
 exports.utf8ToBase64 = str => Buffer.from(str, 'utf-8').toString('base64');
 exports.base64ToUtf8 = str => Buffer.from(str, 'base64').toString('utf-8');
 exports.decodeToUtf8 = (content, encoding) => Buffer.from(content, encoding).toString('utf-8');

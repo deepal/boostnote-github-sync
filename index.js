@@ -11,6 +11,7 @@ launcher
     .withLoggerConfig({
         level: 'debug'
     })
+    .module({ name: 'constants', path: './constants' })
     .module({ name: 'github', path: './github' })
     .module({ name: 'preprocessor', path: './preprocessor' })
     .module({ name: 'sync', path: './sync' })

@@ -1,8 +1,6 @@
-const { basename, extname } = require('path');
-
-module.exports = class MarkdownPublisher {
+module.exports = class RawPublisher {
     /**
-     * Construct a MarkdownPublisher object
+     * Construct a RawPublisher object
      * @param {Map} container
      * @param {Logger} logger
      * @param {Object} config
@@ -15,13 +13,13 @@ module.exports = class MarkdownPublisher {
     }
 
     /**
-     * Publish Markdown Note to Github
+     * Publish Raw file to Github
      * @param {Object} options
      * @param {Object} options.file
      * @param {Object} options.raw
      * @returns {Promise<Object>}
      */
-    async publish({ file, title, content }) {
-        return this.github.publishNote({ file, title, content });
+    async publish({ file, raw }) {
+        return Promise.resolve();
     }
-};
+}

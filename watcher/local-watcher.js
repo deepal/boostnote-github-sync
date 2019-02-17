@@ -58,4 +58,28 @@ module.exports = class LocalWatcher {
             );
         }
     }
+
+    /**
+     * Enumerate directory recursively and trigger callback for all items
+     * @param {string} directory
+     * @param {Function} onChangeDetected
+     * @returns {void}
+     */
+    async enumerateDirectory(directory, onChangeDetected) {
+        this.logger.info(`Enumerating directory: ${directory}`);
+        const contents = await readDir(directory);
+
+        await Promise.all(
+            contents.map(async (item) => {
+                const fullPath = join(directory, item);
+                const stats = await getStats(fullPath);
+                this.logger.debug(`triggering change action for ${fullPath}`);
+                if (stats.isFile()) {
+                    onChangeDetected('change', fullPath);
+                    return;
+                }
+                if (stats.isDirectory()) await this.enumerateDirectory(fullPath, onChangeDetected);
+            })
+        );
+    }
 };

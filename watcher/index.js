@@ -25,6 +25,22 @@ module.exports = class Watcher {
      * @returns {void}
      */
     watch() {
+        if (this.config.enumerateOnStartup) {
+            // Sweep through all notes in the sync directories and emit change events for all notes to trigger sync
+            Promise
+                .all(this.config.localDirs.map(async (dir) => {
+                    await this.localWatcher.enumerateDirectory(dir, (event, filename) => {
+                        this.sync.enqueueSyncItem(event, filename);
+                    });
+                }))
+                .then(() => {
+                    this.logger.info('Enumeration complete.');
+                })
+                .catch((err) => {
+                    this.logger.error('Enumeration failed!', err);
+                });
+        }
+
         if (this.config.enabled) {
             this.localWatcher
                 .start((event, filename) => {

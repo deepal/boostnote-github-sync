@@ -7,23 +7,12 @@ const cson = require('cson');
 const readFile = promisify(fs.readFile);
 const getStat = promisify(fs.stat);
 
-const EVENTS = {
-    FILE_CREATE_OR_UPDATE: 'FILE_CREATE_OR_UPDATE',
-    FILE_DELETE: 'FILE_DELETE',
-    FILE_CHANGE: 'FILE_CHANGE'
-};
-
-const FILE_TYPES = {
-    NOTE: 'NOTE',
-    SNIPPET: 'SNIPPET',
-    MEDIA: 'MEDIA',
-    UNKNOWN: 'UNKNOWN'
-};
-
-module.exports = class EventProcessor {
+class PreProcessor {
     constructor(container, logger) {
+        this.container = container;
         this.logger = logger;
         this.platform = process.platform;
+        this.constants = this.container.module('constants');
     }
 
     async processChangeSet(event, changedFile) {
@@ -49,27 +38,37 @@ module.exports = class EventProcessor {
                     (await readFile(changedFile)).toString(),
                 );
 
+                if (data && data.isTrashed) {
+                    // If the note was deleted from BoostNote, isTrashed is set to true.
+                    return {
+                        event: this.constants.events.FILE_DELETE,
+                        file: changedFile
+                    };
+                }
+
                 return {
-                    event: EVENTS.FILE_CREATE_OR_UPDATE,
+                    event: this.constants.events.FILE_CREATE_OR_UPDATE,
                     file: changedFile,
-                    type: data.type || FILE_TYPES.UNKNOWN,
+                    type: data.type || this.constants.fileTypes.UNKNOWN,
                     raw: data
                 };
             }
             // handle any other file type
             const data = await readFile(changedFile);
             return {
-                event: EVENTS.FILE_CREATE_OR_UPDATE,
+                event: this.constants.events.FILE_CREATE_OR_UPDATE,
                 file: changedFile,
-                type: FILE_TYPES.UNKNOWN,
+                type: this.constants.fileTypes.UNKNOWN,
                 raw: data
             };
         } catch (err) {
             // if err.code === 'ENOENT', it means that the 'changedFile' has been removed
             return {
-                event: EVENTS.FILE_DELETE,
+                event: this.constants.events.FILE_DELETE,
                 file: changedFile
             };
         }
     }
-};
+}
+
+module.exports = PreProcessor;

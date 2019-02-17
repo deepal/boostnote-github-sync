@@ -1,5 +1,6 @@
 const SyncQueue = require('./queue');
 const { isNoteEmpty, sanitizeNote } = require('./utils');
+const Lock = require('./lock');
 const SnippetPublisher = require('./publishers/snippet-publisher');
 const MarkdownPublisher = require('./publishers/markdown-publisher');
 
@@ -19,16 +20,37 @@ module.exports = class Sync {
         this.container = container;
         this.logger = logger;
         this.config = config;
-        this.sync = this.sync.bind(this);
         this.queue = new SyncQueue();
         this.snippetPublisher = new SnippetPublisher(container, logger, config);
         this.markdownPublisher = new MarkdownPublisher(container, logger, config);
-
+        this.lock = new Lock();
         this.preprocessor = this.container.module('preprocessor');
+        this.constants = this.container.module('constants');
         this.github = this.container.module('github');
+    }
 
-        this.enqueueSyncItem = this.enqueueSyncItem.bind(this);
-        this.sync = this.sync.bind(this);
+    /**
+     * Trigger sync process
+     * @returns {Promise}
+     */
+    triggerSync() {
+        if (this.config.enabled) {
+            if (this.queue.length() > 0 && this.lock.aquire()) {
+                this.syncItem()
+                    .then(() => {
+                        /* Wait for some time until the next item is synced. This is to prevent exceeding github API rate limit
+                         * See also: https://developer.github.com/v3/#rate-limiting
+                        */
+                        setTimeout(() => {
+                            this.logger.debug('Releasing Sync lock...');
+                            this.lock.release();
+                            this.triggerSync();
+                        }, this.config.delay);
+                    });
+            }
+        } else {
+            this.logger.warn('Sync process is disable by configuration');
+        }
     }
 
     /**
@@ -38,20 +60,22 @@ module.exports = class Sync {
      * @returns {void}
      */
     enqueueSyncItem(event, file) {
+        // TODO: Move preprocessing to watcher. Sync module has nothing to do with it.
         this.preprocessor
             .processChangeSet(event, file)
             .then((syncEvent) => {
-                this.logger.info(`[event=${syncEvent.event} file=${syncEvent.file} type=${syncEvent.type}]`);
+                this.logger.debug(`[event=${syncEvent.event} file=${syncEvent.file} type=${syncEvent.type || '<n/a>'}]`);
                 this.queue.enqueue(syncEvent);
                 this.logger.info(`[Queue] ${this.queue.length()} items in sync queue!`);
-                return this.sync();
-            })
-            .then(() => {
-                this.logger.info('Sync queue is empty!');
+                this.triggerSync();
             });
     }
 
-    async publishRaw() {
+    /**
+     * Sync raw files to github
+     * @returns {void}
+     */
+    async syncRaw() {
         this.logger.info('Publishing raw files is not yet supported. Skipping...');
     }
 
@@ -63,23 +87,24 @@ module.exports = class Sync {
      * @param {string} options.type
      * @returns {Promise<void>}
      */
-    async publishParsedMarkdown({ file, raw, type }) {
+    async syncParsedMarkdown({ file, raw, type }) {
+        const { title, content } = raw;
         if (type === NOTE_TYPES.MARKDOWN_NOTE) {
-            await this.markdownPublisher.publish({ file, raw });
+            await this.markdownPublisher.publish({ file, title, content });
             this.logger.info(`Content of ${file} synced as a parsed markdown note`);
         }
 
         if (type === NOTE_TYPES.SNIPPET_NOTE) {
-            await this.snippetPublisher.publish({ file, raw });
+            await this.snippetPublisher.publish({ file, title, content });
             this.logger.info(`Content of ${file} synced as a parsed snippet note`);
         }
     }
 
     /**
-     * Run Sync Process
+     * Sync an item from the queue
      * @returns {void}
      */
-    async sync() {
+    async syncItem() {
         try {
             if (!this.config.enabled) {
                 this.logger.info('Sync is disabled by configuration');
@@ -87,30 +112,39 @@ module.exports = class Sync {
             }
 
             // TODO: Should fix the no-await-in-loop lint issue by using Promise.all()
-            while (this.queue.length()) {
-                const item = this.queue.dequeue();
-                const isParsableContent = [
-                    NOTE_TYPES.MARKDOWN_NOTE,
-                    NOTE_TYPES.SNIPPET_NOTE
-                ].includes(item.type);
+            if (this.queue.length()) {
+                const { event, file, raw, type } = this.queue.dequeue();
 
-                if (this.config.modes.raw) {
-                    await this.publishRaw(item); // eslint-disable-line no-await-in-loop
-                }
+                if (event === this.constants.events.FILE_CREATE_OR_UPDATE) {
+                    const isParsableContent = [
+                        NOTE_TYPES.MARKDOWN_NOTE,
+                        NOTE_TYPES.SNIPPET_NOTE
+                    ].includes(type);
 
-                if (this.config.modes.parsed && isParsableContent) {
-                    if (isNoteEmpty(item.raw)) {
-                        this.logger.info(`File ${item.file} is an empty note. Skipping...`);
-                    } else {
-                        await this.publishParsedMarkdown({ // eslint-disable-line no-await-in-loop
-                            ...item,
-                            raw: sanitizeNote(item.raw)
-                        });
+                    if (this.config.modes.raw) {
+                        await this.syncRaw({ file, raw }); // eslint-disable-line no-await-in-loop
                     }
+
+                    if (this.config.modes.parsed && isParsableContent) {
+                        if (isNoteEmpty(raw)) {
+                            this.logger.info(`File ${file} is an empty note. Skipping...`);
+                        } else {
+                            await this.syncParsedMarkdown({ // eslint-disable-line no-await-in-loop
+                                file,
+                                type,
+                                raw: sanitizeNote(raw)
+                            });
+                        }
+                    }
+                } else if (event === this.constants.events.FILE_DELETE) {
+                    await this.github.deleteNote(file); // eslint-disable-line no-await-in-loop
+                    this.logger.info(`File ${file} synced as a deleted note`);
+                } else {
+                    this.logger.info(`Unknown sync event: ${event}. Skipping...`);
                 }
             }
         } catch (err) {
-            this.logger.error('Error occurred during sync process', err);
+            this.logger.error('Error occurred during sync', err);
         }
     }
 };

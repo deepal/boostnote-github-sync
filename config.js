@@ -16,7 +16,8 @@ module.exports = {
             // Remote branch to sync notes to
             branch: 'master',
             // Base directory in the git tree to store notes.
-            baseDir: '/',
+            markdownDir: '/markdown',
+            rawFilesDir: '/raw',
             // Metadata file location. Not recommended to be changed after the first sync run
             metadataFile: '.bgs_stats.json'
         },
@@ -28,6 +29,7 @@ module.exports = {
     },
     sync: {
         enabled: true,
+        delay: 5000,
         modes: {
             raw: false, // sync raw boostnote files
             parsed: true // sync parsed Markdown files
@@ -35,6 +37,7 @@ module.exports = {
     },
     watcher: {
         enabled: true,
+        enumerateOnStartup: false,
         localDirs: [
             // Local boostnote directory. You can either load it from .env or
             // configure here as an array if you have more than one directory

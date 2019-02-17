@@ -4,10 +4,16 @@
  */
 
 const fs = require('fs');
-const { join, basename } = require('path');
+const { basename } = require('path');
 const { promisify } = require('util');
 const os = require('os');
-const { trimSlashes, utf8ToBase64 } = require('./helpers');
+const {
+    trimSlashes,
+    utf8ToBase64,
+    jsonToBase64,
+    getRemoteMarkdownPath,
+    getRemoteRawPath
+} = require('./helpers');
 const { Client, constants, errorCode } = require('./client');
 
 module.exports = class GithubHelper {
@@ -38,8 +44,9 @@ module.exports = class GithubHelper {
      * @returns {Promise<void>}
      */
     async initializeRepository() {
+        //  TODO: Should return the commit hash at HEAD so that it can be subsequently used by callers.
         try {
-            await this.client.fetchGithubUser();
+            if (!this.userId) await this.client.fetchGithubUser();
             await this.client.getHead();
         } catch (err) {
             if (err.code === errorCode.ERR_REPOSITORY_EMPTY) {
@@ -99,7 +106,7 @@ module.exports = class GithubHelper {
                 };
                 await this.publishContent([
                     {
-                        content: JSON.stringify(metadataContent),
+                        content: jsonToBase64(metadataContent),
                         encoding: 'base64',
                         remotePath: this.repoConfig.metadataFile
                     }
@@ -111,20 +118,6 @@ module.exports = class GithubHelper {
             this.logger.error('Unknown error while fetching or creating sync metadata', err);
             throw err;
         }
-    }
-
-    /**
-     * Update sync metadata file
-     * @param {string} content
-     * @returns {Promise<object>}
-     */
-    async updateSyncMetadata(content) {
-        return this.publishContent([
-            {
-                content,
-                remotePath: this.repoConfig.metadataFile
-            }
-        ]);
     }
 
     /**
@@ -159,8 +152,9 @@ module.exports = class GithubHelper {
         ]);
     }
 
-    async publishNote({ content, remotePath, title }) {
+    async publishNote({ file, title, content }) {
         // Add note content to be published to github
+        const remotePath = getRemoteMarkdownPath({ localPath: file, baseDir: this.repoConfig.markdownDir });
         const objectsToPublish = [{
             content,
             remotePath
@@ -199,7 +193,7 @@ module.exports = class GithubHelper {
              * and the table of contents should be updated.
             */
             objectsToPublish.push({
-                content: JSON.stringify(metadata),
+                content: JSON.stringify(metadata, null, 4),
                 remotePath: this.repoConfig.metadataFile
             });
 
@@ -227,7 +221,7 @@ module.exports = class GithubHelper {
         const blobs = await Promise.all(
             objects.map(async ({ content, remotePath }) => {
                 const encodedContent = utf8ToBase64(content);
-                const path = join(this.repoConfig.baseDir, remotePath);
+                const path = remotePath; // join(this.repoConfig.markdownDir, remotePath);
                 this.logger.debug(`Creating blob ${path}`);
                 const sha = await this.client.createBlob({ content: encodedContent, encoding: 'base64' });
                 return { path, sha };
@@ -248,5 +242,57 @@ module.exports = class GithubHelper {
         });
         this.logger.debug(`Commit ${commitHash} created. Updating head...`);
         await this.client.updateHead(commitHash);
+    }
+
+    /**
+     * Delete file from Sync Repository
+     * TODO: Refactor required!
+     * @param {string} localPath
+     * @returns {string}
+     */
+    async deleteNote(localPath) {
+        const rawFilePath = getRemoteRawPath({ localPath, baseDir: this.repoConfig.rawFilesDir });
+        const markdownPath = getRemoteMarkdownPath({ localPath, baseDir: this.repoConfig.markdownDir });
+        await this.initializeRepository();
+        const headHash = await this.client.getHead();
+        const treeHash = await this.client.getTreeHash(headHash);
+        const { tree, truncated } = await this.client.getTree(treeHash, { recursive: true });
+        if (truncated) {
+            // TODO: Handle truncated result
+            this.logger.warn('GitHub Repository too large. Could not delete note.');
+        }
+
+        const metadata = await this.fetchOrCreateSyncMetadata();
+        const updatedMetadata = {
+            ...metadata,
+            lastModified: new Date().toISOString(),
+            notes: metadata.notes.filter(note => note.fileName !== markdownPath)
+        };
+        const updatedReadme = this.generateReadMe(updatedMetadata);
+        const metadataSHA = await this.client.createBlob({ content: jsonToBase64(updatedMetadata), encoding: 'base64' });
+        const readMeSHA = await this.client.createBlob({ content: utf8ToBase64(updatedReadme), encoding: 'base64' });
+
+        // Remote deleted file from the git tree and republish the tree with metadata and readme changes
+        const newTree = tree
+            .filter(subtree => subtree.type === 'blob'
+                && subtree.path !== trimSlashes(markdownPath)
+                && subtree.path !== trimSlashes(rawFilePath))
+            .map((subtree) => {
+                if (subtree.path === 'README.md') {
+                    return { ...subtree, sha: readMeSHA };
+                }
+                if (subtree.path === trimSlashes(this.repoConfig.metadataFile)) {
+                    return { ...subtree, sha: metadataSHA };
+                }
+                return subtree;
+            });
+
+        const newTreeSHA = await this.client.rebuildTree(newTree);
+        const commitSHA = await this.client.commit({
+            parentCommitSHA: headHash,
+            treeSHA: newTreeSHA,
+            message: `Sync deleted notes from host: ${os.hostname()}`
+        });
+        return this.client.updateHead(commitSHA);
     }
 };

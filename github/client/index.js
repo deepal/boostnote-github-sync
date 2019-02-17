@@ -6,6 +6,7 @@
 const requestFn = require('request');
 const { resolve } = require('url');
 const { promisify } = require('util');
+const { join } = require('path');
 const httpStatus = require('../httpStatus');
 const errorCode = require('./errors');
 const {
@@ -229,6 +230,25 @@ exports.Client = class GithubClient {
                     sha
                 }))
             }
+        });
+
+        if (status !== httpStatus.CREATED) {
+            this.logger.error(body);
+            throw new Error('Failed to update tree');
+        }
+        return body.sha;
+    }
+
+    /**
+     * Force rebuild git tree
+     * @param {Object} tree
+     * @returns {string}
+     */
+    async rebuildTree(tree) {
+        const { status, body } = await this.sendRequest({
+            method: 'post',
+            path: `/repos/${this.userId}/${this.repoConfig.name}/git/trees`,
+            body: { tree }
         });
 
         if (status !== httpStatus.CREATED) {
