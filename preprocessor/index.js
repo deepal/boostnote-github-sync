@@ -25,19 +25,15 @@ class PreProcessor {
                  * determine whether this is a file create or delete.
                  * https://nodejs.org/api/fs.html#fs_fs_watch_filename_options_listener
                 */
-
                 const isFile = (await getStat(changedFile)).isFile();
 
                 if (!isFile) {
                     return this.logger.info(`path ${changedFile} is not a regular file. ignoring`);
                 }
             }
-
+            const fileContent = await readFile(changedFile);
             if (ext === '.cson') {
-                const data = cson.parse(
-                    (await readFile(changedFile)).toString(),
-                );
-
+                const data = cson.parse(fileContent.toString());
                 if (data && data.isTrashed) {
                     // If the note was deleted from BoostNote, isTrashed is set to true.
                     return {
@@ -54,12 +50,11 @@ class PreProcessor {
                 };
             }
             // handle any other file type
-            const data = await readFile(changedFile);
             return {
                 event: this.constants.events.FILE_CREATE_OR_UPDATE,
                 file: changedFile,
                 type: this.constants.fileTypes.UNKNOWN,
-                raw: data
+                raw: fileContent.toString('base64')
             };
         } catch (err) {
             // if err.code === 'ENOENT', it means that the 'changedFile' has been removed
