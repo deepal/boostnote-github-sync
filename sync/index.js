@@ -1,4 +1,5 @@
 const SyncQueue = require('./queue');
+const { isNoteEmpty, sanitizeNote } = require('./utils');
 const SnippetPublisher = require('./publishers/snippet-publisher');
 const MarkdownPublisher = require('./publishers/markdown-publisher');
 
@@ -46,7 +47,7 @@ module.exports = class Sync {
                 return this.sync();
             })
             .then(() => {
-                this.logger.info('Sync queue is emptied');
+                this.logger.info('Sync queue is empty!');
             });
     }
 
@@ -80,20 +81,33 @@ module.exports = class Sync {
      */
     async sync() {
         try {
-            if (this.config.enabled) {
-                while (this.queue.length()) {
-                    const item = this.queue.dequeue();
+            if (!this.config.enabled) {
+                this.logger.info('Sync is disabled by configuration');
+                return;
+            }
 
-                    if (this.config.modes.raw) {
-                        await this.publishRaw(item); // eslint-disable-line no-await-in-loop
-                    }
+            // TODO: Should fix the no-await-in-loop lint issue by using Promise.all()
+            while (this.queue.length()) {
+                const item = this.queue.dequeue();
+                const isParsableContent = [
+                    NOTE_TYPES.MARKDOWN_NOTE,
+                    NOTE_TYPES.SNIPPET_NOTE
+                ].includes(item.type);
 
-                    if (this.config.modes.parsed) {
-                        await this.publishParsedMarkdown(item); // eslint-disable-line no-await-in-loop
+                if (this.config.modes.raw) {
+                    await this.publishRaw(item); // eslint-disable-line no-await-in-loop
+                }
+
+                if (this.config.modes.parsed && isParsableContent) {
+                    if (isNoteEmpty(item.raw)) {
+                        this.logger.info(`File ${item.file} is an empty note. Skipping...`);
+                    } else {
+                        await this.publishParsedMarkdown({ // eslint-disable-line no-await-in-loop
+                            ...item,
+                            raw: sanitizeNote(item.raw)
+                        });
                     }
                 }
-            } else {
-                this.logger.info('Sync is disabled by configuration');
             }
         } catch (err) {
             this.logger.error('Error occurred during sync process', err);
