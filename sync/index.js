@@ -4,11 +4,6 @@ const Lock = require('./lock');
 const SnippetPublisher = require('./publishers/snippet-publisher');
 const MarkdownPublisher = require('./publishers/markdown-publisher');
 
-const NOTE_TYPES = {
-    MARKDOWN_NOTE: 'MARKDOWN_NOTE',
-    SNIPPET_NOTE: 'SNIPPET_NOTE'
-};
-
 module.exports = class Sync {
     /**
      * Construct Sync Module
@@ -89,12 +84,12 @@ module.exports = class Sync {
      */
     async syncParsedMarkdown({ file, raw, type }) {
         const { title, content } = raw;
-        if (type === NOTE_TYPES.MARKDOWN_NOTE) {
+        if (type === this.constants.fileTypes.MARKDOWN_NOTE) {
             await this.markdownPublisher.publish({ file, title, content });
             this.logger.info(`Content of ${file} synced as a parsed markdown note`);
         }
 
-        if (type === NOTE_TYPES.SNIPPET_NOTE) {
+        if (type === this.constants.fileTypes.SNIPPET_NOTE) {
             await this.snippetPublisher.publish({ file, title, content });
             this.logger.info(`Content of ${file} synced as a parsed snippet note`);
         }
@@ -117,8 +112,8 @@ module.exports = class Sync {
 
                 if (event === this.constants.events.FILE_CREATE_OR_UPDATE) {
                     const isParsableContent = [
-                        NOTE_TYPES.MARKDOWN_NOTE,
-                        NOTE_TYPES.SNIPPET_NOTE
+                        this.constants.fileTypes.MARKDOWN_NOTE,
+                        this.constants.fileTypes.SNIPPET_NOTE
                     ].includes(type);
 
                     if (this.config.modes.raw) {
