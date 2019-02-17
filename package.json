@@ -11,6 +11,9 @@
     "type": "git",
     "url": "git+https://github.com/dpjayasekara/boostnote-github-sync.git"
   },
+  "pre-commit": [
+    "lint"
+  ],
   "keywords": [
     "boostnote",
     "github"
@@ -22,16 +25,17 @@
   },
   "homepage": "https://github.com/dpjayasekara/boostnote-github-sync#readme",
   "dependencies": {
-    "@dpjayasekara/tscore": "^0.7.0",
-    "cson": "^5.1.0",
-    "dotenv": "^6.2.0",
-    "request": "^2.88.0"
+    "@dpjayasekara/tscore": "0.7.0",
+    "cson": "5.1.0",
+    "dotenv": "6.2.0",
+    "request": "2.88.0"
   },
   "devDependencies": {
-    "eslint": "^5.13.0",
-    "eslint-config-airbnb": "^17.1.0",
-    "eslint-plugin-import": "^2.16.0",
-    "eslint-plugin-jsx-a11y": "^6.2.1",
-    "eslint-plugin-react": "^7.12.4"
+    "eslint": "5.14.0",
+    "eslint-config-airbnb": "17.1.0",
+    "eslint-plugin-import": "2.16.0",
+    "eslint-plugin-jsx-a11y": "6.2.1",
+    "eslint-plugin-react": "7.12.4",
+    "pre-commit": "1.2.2"
   }
 }

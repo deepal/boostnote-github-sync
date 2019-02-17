@@ -19,7 +19,7 @@ module.exports = class RawPublisher {
      * @param {Object} options.raw
      * @returns {Promise<Object>}
      */
-    async publish({ file, raw }) {
+    async publish({ file, raw }) { // eslint-disable-line
         return Promise.resolve();
     }
-}
+};
