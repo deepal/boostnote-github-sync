@@ -1,5 +1,3 @@
-const { basename, extname } = require('path');
-
 module.exports = class SnippetPublisher {
     /**
      * Constructs SnippetSync module

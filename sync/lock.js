@@ -22,4 +22,4 @@ module.exports = class Lock {
     release() {
         this.lock = false;
     }
-}
+};

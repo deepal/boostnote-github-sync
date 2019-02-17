@@ -6,7 +6,6 @@
 const requestFn = require('request');
 const { resolve } = require('url');
 const { promisify } = require('util');
-const { join } = require('path');
 const httpStatus = require('../httpStatus');
 const errorCode = require('./errors');
 const {

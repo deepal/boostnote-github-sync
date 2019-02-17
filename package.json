@@ -4,7 +4,8 @@
   "description": "Sync BoostNote notes into Github Private Repository",
   "main": "dist/index.js",
   "scripts": {
-    "test": "npm test"
+    "test": "npm test",
+    "lint": "eslint ."
   },
   "repository": {
     "type": "git",

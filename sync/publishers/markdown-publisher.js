@@ -1,5 +1,3 @@
-const { basename, extname } = require('path');
-
 module.exports = class MarkdownPublisher {
     /**
      * Construct a MarkdownPublisher object
