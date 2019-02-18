@@ -4,7 +4,7 @@
  */
 
 const fs = require('fs');
-const { basename } = require('path');
+const { basename, dirname, join } = require('path');
 const { promisify } = require('util');
 const os = require('os');
 const {
@@ -128,7 +128,9 @@ module.exports = class GithubHelper {
         const { notes } = metadata;
         let markdownContent = '# Table of Contents\n';
         markdownContent += notes.reduce((out, { fileName, title }) => {
-            const formattedFilePath = `./${trimSlashes(fileName)}`;
+            const fileDir = dirname(fileName);
+            const baseName = basename(fileName);
+            const formattedFilePath = `./${trimSlashes(join(fileDir, encodeURI(baseName)))}`;
             return `${out}- [${title}](${formattedFilePath})\n`;
         }, '');
         return markdownContent;
