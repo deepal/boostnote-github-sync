@@ -106,8 +106,7 @@ module.exports = class GithubHelper {
                 };
                 await this.publishContent([
                     {
-                        content: jsonToBase64(metadataContent),
-                        encoding: 'base64',
+                        content: JSON.stringify(metadataContent),
                         remotePath: this.repoConfig.metadataFile
                     }
                 ]);
@@ -152,7 +151,7 @@ module.exports = class GithubHelper {
         ]);
     }
 
-    async publishNote({ file, title, content }) {
+    async publishNote({ file, title, content, checksum }) {
         // Add note content to be published to github
         const remotePath = getRemoteMarkdownPath({ localPath: file, baseDir: this.repoConfig.markdownDir });
         const objectsToPublish = [{
@@ -160,29 +159,30 @@ module.exports = class GithubHelper {
             remotePath
         }];
 
-        const metadataToPublish = {
+        const newMetadata = {
             fileName: remotePath,
-            title
+            title,
+            checksum
         };
 
         const metadata = await this.fetchOrCreateSyncMetadata();
-        const fileMetaRecord = metadata.notes.find(note => note.fileName === remotePath);
-        const isNewNote = !fileMetaRecord;
-        const isTitleChanged = !isNewNote && fileMetaRecord.title !== metadataToPublish.title;
+        const existingMetadata = metadata.notes.find(note => note.fileName === remotePath);
+        const isNewNote = !existingMetadata;
+        const isTitleChanged = !isNewNote && existingMetadata.title !== newMetadata.title;
 
         if (isNewNote) {
             this.logger.debug(`File ${remotePath} is not in metadata. Updating metadata.`);
             metadata.lastModified = new Date().toISOString();
             metadata.notes = [
                 ...metadata.notes,
-                metadataToPublish
+                newMetadata
             ];
         } else if (isTitleChanged) {
             this.logger.debug(`Note details already exist in metadata, but the note title has been changed to ${title}`);
             metadata.lastModified = new Date().toISOString();
             metadata.notes = metadata.notes.map((curr) => {
                 if (curr.fileName === remotePath) {
-                    return { ...curr, title };
+                    return { ...curr, title, checksum };
                 }
                 return curr;
             });

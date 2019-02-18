@@ -123,13 +123,14 @@ module.exports = class SnippetPublisher {
      * @param {string} options.raw
      * @returns {Promise<object>}
      */
-    async publish({ file, title, content }) {
+    async publish({ file, title, content, checksum }) {
         const noteContent = this.buildNoteContent(content);
 
         return this.github.publishNote({
             file,
             title,
-            content: noteContent
+            content: noteContent,
+            checksum
         });
     }
 };

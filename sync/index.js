@@ -82,15 +82,15 @@ module.exports = class Sync {
      * @param {string} options.type
      * @returns {Promise<void>}
      */
-    async syncParsedMarkdown({ file, raw, type }) {
+    async syncParsedMarkdown({ file, raw, type, checksum }) {
         const { title, content } = raw;
         if (type === this.constants.fileTypes.MARKDOWN_NOTE) {
-            await this.markdownPublisher.publish({ file, title, content });
+            await this.markdownPublisher.publish({ file, title, content, checksum });
             this.logger.info(`Content of ${file} synced as a parsed markdown note`);
         }
 
         if (type === this.constants.fileTypes.SNIPPET_NOTE) {
-            await this.snippetPublisher.publish({ file, title, content });
+            await this.snippetPublisher.publish({ file, title, content, checksum });
             this.logger.info(`Content of ${file} synced as a parsed snippet note`);
         }
     }
@@ -108,7 +108,7 @@ module.exports = class Sync {
 
             // TODO: Should fix the no-await-in-loop lint issue by using Promise.all()
             if (this.queue.length()) {
-                const { event, file, raw, type } = this.queue.dequeue();
+                const { event, file, raw, type, checksum } = this.queue.dequeue();
 
                 if (event === this.constants.events.FILE_CREATE_OR_UPDATE) {
                     const isParsableContent = [
@@ -117,7 +117,7 @@ module.exports = class Sync {
                     ].includes(type);
 
                     if (this.config.modes.raw) {
-                        await this.syncRaw({ file, raw }); // eslint-disable-line no-await-in-loop
+                        await this.syncRaw({ file, raw, checksum }); // eslint-disable-line no-await-in-loop
                     }
 
                     if (this.config.modes.parsed && isParsableContent) {
@@ -127,7 +127,8 @@ module.exports = class Sync {
                             await this.syncParsedMarkdown({ // eslint-disable-line no-await-in-loop
                                 file,
                                 type,
-                                raw: sanitizeNote(raw)
+                                raw: sanitizeNote(raw),
+                                checksum
                             });
                         }
                     }

@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
 const cson = require('cson');
+const { checksum } = require('./utils');
 
 const readFile = promisify(fs.readFile);
 const getStat = promisify(fs.stat);
@@ -32,6 +33,8 @@ class PreProcessor {
                 }
             }
             const fileContent = await readFile(changedFile);
+            const fileChecksum = checksum(fileContent);
+
             if (ext === '.cson') {
                 const data = cson.parse(fileContent.toString());
                 if (data && data.isTrashed) {
@@ -46,7 +49,8 @@ class PreProcessor {
                     event: this.constants.events.FILE_CREATE_OR_UPDATE,
                     file: changedFile,
                     type: data.type || this.constants.fileTypes.UNKNOWN,
-                    raw: data
+                    raw: data,
+                    checksum: fileChecksum
                 };
             }
             // handle any other file type
@@ -54,7 +58,8 @@ class PreProcessor {
                 event: this.constants.events.FILE_CREATE_OR_UPDATE,
                 file: changedFile,
                 type: this.constants.fileTypes.UNKNOWN,
-                raw: fileContent.toString('base64')
+                raw: fileContent.toString('base64'),
+                checksum: fileChecksum
             };
         } catch (err) {
             // if err.code === 'ENOENT', it means that the 'changedFile' has been removed

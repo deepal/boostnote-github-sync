@@ -19,7 +19,7 @@ module.exports = class MarkdownPublisher {
      * @param {Object} options.raw
      * @returns {Promise<Object>}
      */
-    async publish({ file, title, content }) {
-        return this.github.publishNote({ file, title, content });
+    async publish({ file, title, content, checksum }) {
+        return this.github.publishNote({ file, title, content, checksum });
     }
 };

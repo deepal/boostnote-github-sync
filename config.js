@@ -29,7 +29,7 @@ module.exports = {
     },
     sync: {
         enabled: true,
-        delay: 5000,
+        delay: 750,
         modes: {
             raw: false, // sync raw boostnote files
             parsed: true // sync parsed Markdown files

@@ -16,6 +16,22 @@ exports.getRemoteMarkdownPath = ({ localPath, baseDir = '/', subDir = '/' }) => 
         )
     );
 };
+
+exports.escapeMarkdown = (unesaped) => {
+    const replacements = [
+        [/\*/g, '\\*'],
+        [/#/g, '\\#'],
+        [/\//g, '\\/'],
+        [/\(/g, '\\('],
+        [/\)/g, '\\)'],
+        [/\[/g, '\\['],
+        [/\]/g, '\\]'],
+        [/</g, '&lt;'],
+        [/>/g, '&gt;'],
+        [/_/g, '\\_']];
+
+    return replacements.reduce((curr, replacement) => curr.replace(replacement[0], replacement[1]), unesaped);
+};
 exports.getRemoteRawPath = ({ localPath, baseDir = '/', subDir = '/' }) => exports.trimSlashes(join(baseDir, subDir, basename(localPath)));
 exports.utf8ToBase64 = str => Buffer.from(str, 'utf-8').toString('base64');
 exports.base64ToUtf8 = str => Buffer.from(str, 'base64').toString('utf-8');
