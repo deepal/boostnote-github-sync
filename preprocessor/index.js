@@ -9,7 +9,7 @@ const readFile = promisify(fs.readFile);
 const getStat = promisify(fs.stat);
 
 class PreProcessor {
-    constructor(container, logger) {
+    constructor({ container, logger }) {
         this.container = container;
         this.logger = logger;
         this.platform = process.platform;

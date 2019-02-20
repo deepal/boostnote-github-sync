@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/dpjayasekara/boostnote-github-sync#readme",
   "dependencies": {
-    "@dpjayasekara/tscore": "0.7.0",
+    "@dpjayasekara/tscore": "0.8.0",
     "cson": "5.1.0",
     "dotenv": "6.2.0",
     "request": "2.88.0"

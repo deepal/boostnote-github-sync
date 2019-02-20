@@ -8,14 +8,14 @@ module.exports = class Watcher {
      * @param {Logger} logger
      * @param {Object} config
      */
-    constructor(container, logger, config) {
+    constructor({ container, logger, config }) {
         this.container = container;
         this.logger = logger;
         this.config = config;
         this.watch = this.watch.bind(this);
 
         this.sync = this.container.module('sync');
-        this.localWatcher = new LocalWatcher(container, logger, config);
+        this.localWatcher = new LocalWatcher({ container, logger, config });
 
         this.container.on(Constants.EVENT.APPLICATION_START, this.watch);
     }

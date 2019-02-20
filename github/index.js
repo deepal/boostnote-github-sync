@@ -23,7 +23,7 @@ module.exports = class GithubHelper {
      * @param {*} logger
      * @param {*} config
      */
-    constructor(container, logger, config) {
+    constructor({ container, logger, config }) {
         this.container = container;
         this.logger = logger;
         this.config = config;
@@ -32,10 +32,14 @@ module.exports = class GithubHelper {
         this.apiConfig = this.config.api;
         this.commitConfig = this.config.commit;
 
-        this.client = new Client(container, logger, {
-            repoConfig: this.repoConfig,
-            apiConfig: this.apiConfig,
-            commitConfig: this.commitConfig
+        this.client = new Client({
+            container,
+            logger,
+            config: {
+                repoConfig: this.repoConfig,
+                apiConfig: this.apiConfig,
+                commitConfig: this.commitConfig
+            }
         });
     }
 

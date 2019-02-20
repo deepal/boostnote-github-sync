@@ -4,7 +4,7 @@ module.exports = class SnippetPublisher {
      * @param {Map} container
      * @param {Object} logger
      */
-    constructor(container, logger) {
+    constructor({ container, logger }) {
         this.container = container;
         this.logger = logger;
         this.github = this.container.module('github');

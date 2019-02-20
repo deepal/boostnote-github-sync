@@ -27,7 +27,8 @@ exports.Client = class GithubClient {
      * @param {*} logger
      * @param {*} config
      */
-    constructor(container, logger, { repoConfig, apiConfig, commitConfig }) {
+    constructor({ container, logger, config }) {
+        const { repoConfig, apiConfig, commitConfig } = config;
         this.container = container;
         this.logger = logger;
 

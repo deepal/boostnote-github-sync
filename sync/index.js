@@ -11,13 +11,13 @@ module.exports = class Sync {
      * @param {Logger} logger
      * @param {Object} config
      */
-    constructor(container, logger, config) {
+    constructor({ container, logger, config }) {
         this.container = container;
         this.logger = logger;
         this.config = config;
         this.queue = new SyncQueue();
-        this.snippetPublisher = new SnippetPublisher(container, logger, config);
-        this.markdownPublisher = new MarkdownPublisher(container, logger, config);
+        this.snippetPublisher = new SnippetPublisher({ container, logger, config });
+        this.markdownPublisher = new MarkdownPublisher({ container, logger, config });
         this.lock = new Lock();
         this.preprocessor = this.container.module('preprocessor');
         this.constants = this.container.module('constants');

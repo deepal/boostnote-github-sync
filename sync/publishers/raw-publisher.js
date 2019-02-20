@@ -5,7 +5,7 @@ module.exports = class RawPublisher {
      * @param {Logger} logger
      * @param {Object} config
      */
-    constructor(container, logger, config) {
+    constructor({ container, logger, config }) {
         this.container = container;
         this.logger = logger;
         this.config = config;
