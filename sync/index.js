@@ -108,35 +108,41 @@ module.exports = class Sync {
 
             // TODO: Should fix the no-await-in-loop lint issue by using Promise.all()
             if (this.queue.length()) {
-                const { event, file, raw, type, checksum } = this.queue.dequeue();
+                const queueItem = this.queue.dequeue();
+                const { event, file, raw, type, checksum } = queueItem;
 
-                if (event === this.constants.events.FILE_CREATE_OR_UPDATE) {
-                    const isParsableContent = [
-                        this.constants.fileTypes.MARKDOWN_NOTE,
-                        this.constants.fileTypes.SNIPPET_NOTE
-                    ].includes(type);
+                try {
+                    if (event === this.constants.events.FILE_CREATE_OR_UPDATE) {
+                        const isParsableContent = [
+                            this.constants.fileTypes.MARKDOWN_NOTE,
+                            this.constants.fileTypes.SNIPPET_NOTE
+                        ].includes(type);
 
-                    if (this.config.modes.raw) {
-                        await this.syncRaw({ file, raw, checksum }); // eslint-disable-line no-await-in-loop
-                    }
-
-                    if (this.config.modes.parsed && isParsableContent) {
-                        if (isNoteEmpty(raw)) {
-                            this.logger.info(`File ${file} is an empty note. Skipping...`);
-                        } else {
-                            await this.syncParsedMarkdown({ // eslint-disable-line no-await-in-loop
-                                file,
-                                type,
-                                raw: sanitizeNote(raw),
-                                checksum
-                            });
+                        if (this.config.modes.raw) {
+                            await this.syncRaw({ file, raw, checksum }); // eslint-disable-line no-await-in-loop
                         }
+
+                        if (this.config.modes.parsed && isParsableContent) {
+                            if (isNoteEmpty(raw)) {
+                                this.logger.info(`File ${file} is an empty note. Skipping...`);
+                            } else {
+                                await this.syncParsedMarkdown({ // eslint-disable-line no-await-in-loop
+                                    file,
+                                    type,
+                                    raw: sanitizeNote(raw),
+                                    checksum
+                                });
+                            }
+                        }
+                    } else if (event === this.constants.events.FILE_DELETE) {
+                        await this.github.deleteNote(file); // eslint-disable-line no-await-in-loop
+                        this.logger.info(`File ${file} synced as a deleted note`);
+                    } else {
+                        this.logger.info(`Unknown sync event: ${event}. Skipping...`);
                     }
-                } else if (event === this.constants.events.FILE_DELETE) {
-                    await this.github.deleteNote(file); // eslint-disable-line no-await-in-loop
-                    this.logger.info(`File ${file} synced as a deleted note`);
-                } else {
-                    this.logger.info(`Unknown sync event: ${event}. Skipping...`);
+                } catch (err) {
+                    this.logger.warn(`An error occurred while syncing ${file}. Adding it back to the sync queue`);
+                    this.queue.enqueue(queueItem);
                 }
             }
         } catch (err) {
