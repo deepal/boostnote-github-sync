@@ -1,5 +1,9 @@
 {
-    "extends": "airbnb",
+    "extends":[
+      "airbnb",
+      "plugin:import/errors",
+      "plugin:import/warnings"
+    ],
     "rules": {
         "indent": ["error", 4],
         "max-len": ["error", { "code": 200 }],
