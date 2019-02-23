@@ -21,9 +21,8 @@ module.exports = class Sync {
         this.lock = new Lock();
         this.preprocessor = this.container.module('preprocessor');
         this.github = this.container.module('github');
-        const { constants, errors } = this.container.module('definitions');
+        const { constants } = this.container.module('definitions');
         this.constants = constants;
-        this.errors = errors;
     }
 
     /**
@@ -65,6 +64,9 @@ module.exports = class Sync {
                 this.queue.enqueue(syncEvent);
                 this.logger.info(`[Queue] ${this.queue.length()} items in sync queue!`);
                 this.triggerSync();
+            })
+            .catch((err) => {
+                this.logger.error('Preprocess failed', err);
             });
     }
 

@@ -4,6 +4,7 @@ const path = require('path');
 const { promisify } = require('util');
 const cson = require('cson');
 const { checksum } = require('./utils');
+const { PreProcessError } = require('./errors');
 
 const readFile = promisify(fs.readFile);
 const getStat = promisify(fs.stat);
@@ -13,9 +14,8 @@ class PreProcessor {
         this.container = container;
         this.logger = logger;
         this.platform = process.platform;
-        const { constants, errors } = this.container.module('definitions');
+        const { constants } = this.container.module('definitions');
         this.constants = constants;
-        this.errors = errors;
     }
 
     async processChangeSet(event, changedFile) {
@@ -65,10 +65,13 @@ class PreProcessor {
             };
         } catch (err) {
             // if err.code === 'ENOENT', it means that the 'changedFile' has been removed
-            return {
-                event: this.constants.events.FILE_DELETE,
-                file: changedFile
-            };
+            if (err.code === 'ENOENT') {
+                return {
+                    event: this.constants.events.FILE_DELETE,
+                    file: changedFile
+                };
+            }
+            throw new PreProcessError(`Error occurred while preprocessing event: ${err.message}`);
         }
     }
 }
