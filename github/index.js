@@ -14,7 +14,10 @@ const {
     getRemoteMarkdownPath,
     getRemoteRawPath
 } = require('./helpers');
-const { Client, constants, errorCode } = require('./client');
+const { RemoteFileNotFoundError } = require('./errors');
+const { Client, constants } = require('./client');
+
+const ERR_REPOSITORY_EMPTY = 'ERR_REPOSITORY_EMPTY';
 
 module.exports = class GithubHelper {
     /**
@@ -53,13 +56,13 @@ module.exports = class GithubHelper {
             if (!this.userId) await this.client.fetchGithubUser();
             await this.client.getHead();
         } catch (err) {
-            if (err.code === errorCode.ERR_REPOSITORY_EMPTY) {
+            if (err.code === ERR_REPOSITORY_EMPTY) {
                 this.logger.debug('Repository seems to be empty. Initializing with a README.md');
                 await this.client.initializeReadMe();
                 return;
             }
 
-            throw new Error('Failed to initialize repository', err);
+            throw err;
         }
     }
 
@@ -79,9 +82,7 @@ module.exports = class GithubHelper {
         const blob = tree.find(({ type, path }) => type === constants.GITHUB_BLOB_TYPE && path === trimSlashes(filePath));
 
         if (!blob) {
-            const error = new Error(`File not found. [truncated_result=${truncated}]`);
-            error.code = constants.ERR_FILE_NOT_FOUND;
-            throw error;
+            throw new RemoteFileNotFoundError(`File not found. [truncated_result=${truncated}]`);
         }
 
         return this.client.getBlob(blob.sha);
@@ -100,7 +101,7 @@ module.exports = class GithubHelper {
             this.logger.debug(`Fetched metadata file at ${this.repoConfig.metadataFile}`);
             return JSON.parse(content);
         } catch (err) {
-            if (err.code === constants.ERR_FILE_NOT_FOUND) {
+            if (err.code === 'ERR_REMOTE_FILE_NOT_FOUND') {
                 this.logger.info(`Metadata file not found on branch ${this.repoConfig.branch}. Creating new file...`);
                 const timestamp = new Date().toISOString();
                 const metadataContent = {
@@ -118,7 +119,7 @@ module.exports = class GithubHelper {
                 return metadataContent;
             }
 
-            this.logger.error('Unknown error while fetching or creating sync metadata', err);
+            this.logger.error('Unknown error while fetching or creating sync metadata');
             throw err;
         }
     }

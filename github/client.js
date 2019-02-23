@@ -6,19 +6,22 @@
 const requestFn = require('request');
 const { resolve } = require('url');
 const { promisify } = require('util');
-const httpStatus = require('../httpStatus');
-const errorCode = require('./errors');
+const httpStatus = require('./httpStatus');
+const {
+    RepositoryEmptyError,
+    GitHubInternalError,
+    AuthorizationError
+} = require('./errors');
+
 const {
     trimSlashes,
     decodeToUtf8
-} = require('../helpers');
+} = require('./helpers');
 
 const GITHUB_BLOB_MODE = '100644';
 const GITHUB_BLOB_TYPE = 'blob';
-const ERR_FILE_NOT_FOUND = 'ENOENT';
 
-exports.constants = { GITHUB_BLOB_MODE, GITHUB_BLOB_TYPE, ERR_FILE_NOT_FOUND };
-exports.errorCode = errorCode;
+exports.constants = { GITHUB_BLOB_MODE, GITHUB_BLOB_TYPE };
 
 exports.Client = class GithubClient {
     /**
@@ -76,6 +79,19 @@ exports.Client = class GithubClient {
     }
 
     /**
+     * Generate an error object based on the status code
+     * @param {number} statusCode
+     * @returns {Error}
+     */
+    static generateError(statusCode) {
+        return (message) => {
+            if (statusCode === httpStatus.UNAUTHORIZED) return new AuthorizationError(message);
+            if (statusCode === httpStatus.CONFLICT) return new RepositoryEmptyError(message);
+            return new GitHubInternalError(message);
+        };
+    }
+
+    /**
      * Get github user id
      * @returns {void}
      */
@@ -86,8 +102,7 @@ exports.Client = class GithubClient {
         });
 
         if (status !== httpStatus.OK) {
-            this.logger.error(body);
-            throw new Error('Failed to fetch user details');
+            throw GithubClient.generateError(status)(`Failed to fetch user details: ${body.message}`);
         }
 
         const { login } = body;
@@ -106,15 +121,8 @@ exports.Client = class GithubClient {
             path: `/repos/${this.userId}/${this.repoConfig.name}/git/refs/${refs}` // default notes branch is 'master'
         });
 
-        if (status === httpStatus.CONFLICT) {
-            const error = new Error(body.message);
-            error.code = errorCode.ERR_REPOSITORY_EMPTY;
-            throw error;
-        }
-
         if (status !== httpStatus.OK) {
-            this.logger.error(body);
-            throw new Error('Failed to fetch head');
+            throw GithubClient.generateError(status)(`Failed to fetch head: ${body.message}`);
         }
 
         const { object } = body;
@@ -133,8 +141,7 @@ exports.Client = class GithubClient {
         });
 
         if (status !== httpStatus.OK) {
-            this.logger.error(body);
-            throw new Error('Failed to fetch commit stats');
+            throw GithubClient.generateError(status)(`Failed to fetch commit stats: ${body.message}`);
         }
 
         const { message, tree } = body;
@@ -156,8 +163,7 @@ exports.Client = class GithubClient {
             body: { content, encoding }
         });
         if (status !== httpStatus.CREATED) {
-            this.logger.error(body);
-            throw new Error('Failed to create blob from content');
+            throw GithubClient.generateError(status)(`Failed to create blob from content: ${body.message}`);
         }
 
         const { sha } = body;
@@ -170,8 +176,7 @@ exports.Client = class GithubClient {
             path: `/repos/${this.userId}/${this.repoConfig.name}/git/blobs/${blobSHA}`
         });
         if (status !== httpStatus.OK) {
-            this.logger.error(body);
-            throw new Error(`Failed to get blob ${blobSHA}`);
+            throw GithubClient.generateError(status)(`Failed to get blob ${blobSHA}: ${body.message}`);
         }
 
         const { content, encoding } = body;
@@ -201,8 +206,7 @@ exports.Client = class GithubClient {
         }
 
         if (status !== httpStatus.OK) {
-            this.logger.error(body);
-            throw new Error(`Failed to get tree ${treeHash}`);
+            throw GithubClient.generateError(status)(`Failed to get tree ${treeHash}: ${body.message}`);
         }
         const { tree, truncated } = body;
         return { tree, truncated };
@@ -233,8 +237,7 @@ exports.Client = class GithubClient {
         });
 
         if (status !== httpStatus.CREATED) {
-            this.logger.error(body);
-            throw new Error('Failed to update tree');
+            throw GithubClient.generateError(status)(`Failed to update tree: ${body.message}`);
         }
         return body.sha;
     }
@@ -252,8 +255,7 @@ exports.Client = class GithubClient {
         });
 
         if (status !== httpStatus.CREATED) {
-            this.logger.error(body);
-            throw new Error('Failed to update tree');
+            throw GithubClient.generateError(status)(`Failed to update tree: ${body.message}`);
         }
         return body.sha;
     }
@@ -283,8 +285,7 @@ exports.Client = class GithubClient {
         });
 
         if (status !== httpStatus.CREATED) {
-            this.logger.error(body);
-            throw new Error('Failed to commit file');
+            throw GithubClient.generateError(status)(`Failed to commit file: ${body.message}`);
         }
         return body.sha;
     }
@@ -305,8 +306,7 @@ exports.Client = class GithubClient {
         });
 
         if (status !== httpStatus.OK) {
-            this.logger.error(body);
-            throw new Error('Failed to update head');
+            throw GithubClient.generateError(status)(`Failed to update head: ${body.message}`);
         }
         return body;
     }
@@ -330,8 +330,7 @@ exports.Client = class GithubClient {
         });
 
         if (status !== httpStatus.CREATED) {
-            this.logger.error(body.message);
-            throw new Error('Failed to initialize repository');
+            throw GithubClient.generateError(status)(`Failed to initialize repository: ${body.message}`);
         }
 
         const { commit } = body;

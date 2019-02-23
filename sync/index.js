@@ -20,8 +20,10 @@ module.exports = class Sync {
         this.markdownPublisher = new MarkdownPublisher({ container, logger, config });
         this.lock = new Lock();
         this.preprocessor = this.container.module('preprocessor');
-        this.constants = this.container.module('constants');
         this.github = this.container.module('github');
+        const { constants, errors } = this.container.module('definitions');
+        this.constants = constants;
+        this.errors = errors;
     }
 
     /**
@@ -141,7 +143,7 @@ module.exports = class Sync {
                         this.logger.info(`Unknown sync event: ${event}. Skipping...`);
                     }
                 } catch (err) {
-                    this.logger.warn(`An error occurred while syncing ${file}. Adding it back to the sync queue`);
+                    this.logger.warn(err, `An error occurred while syncing ${file}. Adding it back to the sync queue`);
                     this.queue.enqueue(queueItem);
                 }
             }

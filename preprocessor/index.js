@@ -13,7 +13,9 @@ class PreProcessor {
         this.container = container;
         this.logger = logger;
         this.platform = process.platform;
-        this.constants = this.container.module('constants');
+        const { constants, errors } = this.container.module('definitions');
+        this.constants = constants;
+        this.errors = errors;
     }
 
     async processChangeSet(event, changedFile) {
